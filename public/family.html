@@ -267,6 +267,34 @@ dd { margin: 0; }
 @keyframes focus-pulse { 50% { transform: scale(1.06); } }
 .branch-boundary-marker { display: none; width: 280px; margin-top: .65rem; padding: .45rem .6rem; color: #6f5427; text-align: center; font-size: .68rem; border: 1px dashed #9b7636; border-radius: .4rem; background: #fff4ce; }
 .show-branch-boundaries .branch-boundary-marker { display: block; }
+.header-actions { display: flex; align-items: center; gap: .55rem; }
+.header-actions > span { font-size: .78rem; opacity: .85; }
+.role-login-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+.role-login-grid button { display: grid; gap: .35rem; padding: 1rem; text-align: left; color: var(--ink); border: 1px solid #d8c7a8; border-radius: .7rem; background: #fffaf0; cursor: pointer; }
+.role-login-grid button:hover { border-color: var(--red); }
+.role-login-grid span { color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.review-tabs { display: flex; gap: .45rem; margin-bottom: .8rem; }
+.review-tabs button { padding: .45rem .7rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: 999px; background: white; cursor: pointer; }
+.review-tabs button.active { color: white; border-color: var(--red); background: var(--red); }
+.generation-explorer-panel { max-width: 1100px; margin: 0 auto 1rem; padding: .9rem; border: 1px solid #d5c09c; border-radius: .75rem; background: rgba(255,253,248,.86); }
+.generation-explorer-heading { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
+.generation-explorer-heading div { display: grid; gap: .2rem; }
+.generation-explorer-heading strong { color: var(--red); }
+.generation-explorer-heading span { color: var(--muted); font-size: .76rem; }
+.generation-explorer-heading button { align-self: center; padding: .42rem .68rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: .45rem; background: white; cursor: pointer; }
+.generation-explorer { max-height: 28rem; overflow: auto; border: 1px solid #dfd2bc; background: white; }
+.generation-explorer-level { border-bottom: 1px solid #eee4d4; }
+.generation-explorer-level summary { display: flex; align-items: center; gap: .65rem; min-height: 2.7rem; padding: .55rem .7rem; cursor: pointer; user-select: none; }
+.generation-explorer-level summary:hover { background: #f3e7d2; }
+.generation-explorer-level[open] > summary { color: white; background: var(--red); }
+.generation-explorer-level summary small { margin-left: auto; opacity: .75; }
+.explorer-folder::before { content: "▸"; display: inline-block; width: 1.2rem; transition: transform .15s ease; }
+.generation-explorer-level[open] > summary .explorer-folder::before { transform: rotate(90deg); }
+.generation-explorer-content { margin-left: 1.5rem; border-left: 1px solid #d8c7a8; }
+.explorer-name-list { display: flex; flex-wrap: wrap; gap: .35rem; padding: .65rem; }
+.explorer-name-list button { padding: .35rem .55rem; color: var(--ink); border: 1px solid #e0d2b9; border-radius: .35rem; background: #fffaf0; cursor: pointer; }
+.explorer-name-list span, .generation-end { padding: .45rem .65rem; color: var(--muted); font-size: .75rem; }
+@media (max-width: 640px) { .role-login-grid { grid-template-columns: 1fr; } .header-actions { flex-wrap: wrap; justify-content: flex-end; } }
 
 </style>
 </head>
@@ -277,7 +305,11 @@ dd { margin: 0; }
       <h1>凌氏家谱</h1>
       <p class="subtitle">慎终追远 · 记录家族根脉</p>
     </div>
-    <button id="privacyButton" class="privacy-button" type="button">隐私说明</button>
+    <div class="header-actions">
+      <span id="accountLabel">尚未登录</span>
+      <button id="loginButton" class="privacy-button" type="button">登录</button>
+      <button id="privacyButton" class="privacy-button" type="button">隐私说明</button>
+    </div>
   </header>
 
   <main>
@@ -295,11 +327,18 @@ dd { margin: 0; }
         <div class="search-status" id="searchStatus" role="status" aria-live="polite"></div>
       </div>
     </section>
-    <section class="action-bar" aria-label="编辑与管理">
+    <section id="actionBar" class="action-bar" aria-label="编辑与管理" hidden>
       <button id="addMemberButton" type="button">＋ 添加成员</button>
       <button id="editMemberButton" type="button">编辑最近查看人物</button>
       <button id="reviewButton" type="button" class="admin-button">管理员审核 <span id="reviewCount" class="count-badge">0</span></button>
       <p id="actionStatus" role="status" aria-live="polite"></p>
+    </section>
+    <section class="generation-explorer-panel" aria-labelledby="generationExplorerTitle">
+      <div class="generation-explorer-heading">
+        <div><strong id="generationExplorerTitle">五代层级导航</strong><span>点击箭头逐代展开，直观看清上一代与下一代</span></div>
+        <button id="expandAllGenerations" type="button">全部展开</button>
+      </div>
+      <div id="generationExplorer" class="generation-explorer"></div>
     </section>
     <section class="generation-filter" aria-label="按代查看">
       <strong>快捷查看</strong>
@@ -346,6 +385,15 @@ dd { margin: 0; }
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
     <div id="memberDetail"></div>
   </dialog>
+  <dialog id="loginDialog" class="form-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <h2>家族成员登录</h2>
+    <p class="dialog-intro">当前为权限流程演示。正式版将通过微信身份、家族邀请码和 Java 后端校验身份。</p>
+    <div class="role-login-grid">
+      <button type="button" data-login-role="member"><strong>普通成员</strong><span>查看族谱、提交新增或修改申请</span></button>
+      <button type="button" data-login-role="admin"><strong>管理员</strong><span>拥有普通成员权限，并进入审核中心</span></button>
+    </div>
+  </dialog>
   <dialog id="privacyDialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
     <h2>隐私设计方向</h2>
@@ -366,8 +414,13 @@ dd { margin: 0; }
   </dialog>
   <dialog id="reviewDialog" class="review-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
-    <h2>管理员审核</h2>
-    <p class="dialog-intro">批准后才会应用到当前族谱；正式版将由 Java 后端记录审核人和时间。</p>
+    <h2>管理员审核中心</h2>
+    <p class="dialog-intro">集中处理族人注册、成员资料新增及资料修改。正式版将由 Java 后端记录审核人、结论和时间。</p>
+    <div class="review-tabs" role="tablist">
+      <button type="button" class="active" data-review-filter="all">全部</button>
+      <button type="button" data-review-filter="registration">注册申请</button>
+      <button type="button" data-review-filter="profile">资料申请</button>
+    </div>
     <div id="reviewList"></div>
   </dialog>
 <script>
@@ -559,8 +612,19 @@ dd { margin: 0; }
   const relationshipSearch = document.querySelector("#relationshipSearch");
   const zoomSlider = document.querySelector("#zoomSlider");
   const fitViewButton = document.querySelector("#fitViewButton");
+  const loginDialog = document.querySelector("#loginDialog");
+  const loginButton = document.querySelector("#loginButton");
+  const accountLabel = document.querySelector("#accountLabel");
+  const actionBar = document.querySelector("#actionBar");
+  const reviewButton = document.querySelector("#reviewButton");
+  const generationExplorer = document.querySelector("#generationExplorer");
   let lastViewedPerson = null;
-  let pendingReviews = [];
+  let currentRole = null;
+  let reviewFilter = "all";
+  let pendingReviews = [
+    { id: "demo-registration", type: "registration", category: "registration", title: "族人注册：凌某（演示）", submittedAt: "2026/9/5 19:30", reason: "邀请码：LS-2026；申请加入第三代成员可见范围。" },
+    { id: "demo-profile", type: "profile", category: "profile", title: "资料补充：家族往事（演示）", submittedAt: "2026/9/5 19:42", reason: "补充人物职业和生平资料，来源为本人填写。" }
+  ];
   let treeZoom = 1;
   let canvasLocked = false;
   let isRightDragging = false;
@@ -689,6 +753,48 @@ dd { margin: 0; }
     stats.textContent = `${data.people.length} 位人物 · 5 代 · ${roots.length} 个第一代家庭`;
     tree.style.zoom = treeZoom;
     tree.classList.toggle("show-branch-boundaries", showBranchBoundary);
+    renderGenerationExplorer();
+  }
+
+  function renderGenerationExplorer() {
+    generationExplorer.replaceChildren();
+    const makeLevel = (generation) => {
+      const people = data.people.filter((person) => person.generation === generation && (person.lineage === "ling" || person.fatherId || person.motherId));
+      const details = document.createElement("details");
+      details.className = `generation-explorer-level explorer-generation-${generation}`;
+      details.open = generation < 3;
+      const summary = document.createElement("summary");
+      summary.innerHTML = `<span class="explorer-folder">第${generation}代</span><small>${people.length} 位本家成员</small>`;
+      details.appendChild(summary);
+      const content = document.createElement("div");
+      content.className = "generation-explorer-content";
+      const names = document.createElement("div");
+      names.className = "explorer-name-list";
+      people.slice(0, 18).forEach((person) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = person.name;
+        button.addEventListener("click", () => showPerson(person));
+        names.appendChild(button);
+      });
+      if (people.length > 18) names.insertAdjacentHTML("beforeend", `<span>另有 ${people.length - 18} 位…</span>`);
+      content.appendChild(names);
+      if (generation < 5) content.appendChild(makeLevel(generation + 1));
+      else content.insertAdjacentHTML("beforeend", '<div class="generation-end">五代同谱到此 · 第六代起可建立分支谱</div>');
+      details.appendChild(content);
+      return details;
+    };
+    generationExplorer.appendChild(makeLevel(1));
+  }
+
+  function applyRole(role) {
+    currentRole = role;
+    actionBar.hidden = false;
+    accountLabel.textContent = role === "admin" ? "已登录：管理员" : "已登录：普通成员";
+    loginButton.textContent = "切换身份";
+    reviewButton.hidden = role !== "admin";
+    actionStatus.textContent = role === "admin" ? "管理员模式：可以审核注册和资料申请。" : "普通成员模式：可以提交资料，审核中心不可见。";
+    loginDialog.close();
   }
 
   function childrenOf(personId) {
@@ -896,7 +1002,7 @@ dd { margin: 0; }
   }
 
   function queueReview(review) {
-    pendingReviews.push({ id: `review-${Date.now()}-${pendingReviews.length}`, submittedAt: new Date().toLocaleString("zh-CN"), ...review });
+    pendingReviews.push({ id: `review-${Date.now()}-${pendingReviews.length}`, category: "profile", submittedAt: new Date().toLocaleString("zh-CN"), ...review });
     updateReviewBadge();
     actionStatus.textContent = "申请已提交，等待管理员审核。";
   }
@@ -968,7 +1074,9 @@ dd { margin: 0; }
 
   function approveReview(review) {
     let approvedPersonId = null;
-    if (review.type === "edit") {
+    if (review.type === "registration" || review.type === "profile") {
+      approvedPersonId = null;
+    } else if (review.type === "edit") {
       const person = peopleById.get(review.personId);
       if (person) Object.assign(person, review.patch);
     } else {
@@ -1012,12 +1120,13 @@ dd { margin: 0; }
   }
 
   function renderReviews() {
-    if (!pendingReviews.length) {
+    const visibleReviews = pendingReviews.filter((review) => reviewFilter === "all" || review.category === reviewFilter);
+    if (!visibleReviews.length) {
       reviewList.innerHTML = '<div class="empty-state">目前没有待审核申请。</div>';
       return;
     }
     reviewList.replaceChildren();
-    pendingReviews.forEach((review) => {
+    visibleReviews.forEach((review) => {
       const item = document.createElement("article");
       item.className = "review-item";
       item.innerHTML = `<div><strong>${escapeHtml(review.title)}</strong><small>${escapeHtml(review.submittedAt)}</small><p>${escapeHtml(review.reason || "未填写原因")}</p></div><div class="review-actions"><button type="button" data-action="approve">批准</button><button type="button" data-action="reject" class="secondary-action">驳回</button></div>`;
@@ -1071,7 +1180,20 @@ dd { margin: 0; }
   document.querySelector("#privacyButton").addEventListener("click", () => privacyDialog.showModal());
   document.querySelector("#addMemberButton").addEventListener("click", openAddDialog);
   document.querySelector("#editMemberButton").addEventListener("click", openEditDialog);
-  document.querySelector("#reviewButton").addEventListener("click", () => { renderReviews(); reviewDialog.showModal(); });
+  reviewButton.addEventListener("click", () => { if (currentRole !== "admin") return; renderReviews(); reviewDialog.showModal(); });
+  loginButton.addEventListener("click", () => loginDialog.showModal());
+  document.querySelectorAll("[data-login-role]").forEach((button) => button.addEventListener("click", () => applyRole(button.dataset.loginRole)));
+  document.querySelectorAll("[data-review-filter]").forEach((button) => button.addEventListener("click", () => {
+    reviewFilter = button.dataset.reviewFilter;
+    document.querySelectorAll("[data-review-filter]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+    renderReviews();
+  }));
+  document.querySelector("#expandAllGenerations").addEventListener("click", (event) => {
+    const levels = [...generationExplorer.querySelectorAll("details")];
+    const shouldOpen = levels.some((level) => !level.open);
+    levels.forEach((level) => { level.open = shouldOpen; });
+    event.currentTarget.textContent = shouldOpen ? "全部收起" : "全部展开";
+  });
   document.querySelector("#zoomOutButton").addEventListener("click", () => setTreeZoom(treeZoom - .1));
   document.querySelector("#zoomInButton").addEventListener("click", () => setTreeZoom(treeZoom + .1));
   document.querySelector("#zoomResetButton").addEventListener("click", () => setTreeZoom(1));
