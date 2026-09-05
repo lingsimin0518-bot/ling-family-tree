@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>凌氏家谱 H5</title>
+  <style>
+:root {
+  color-scheme: light;
+  --ink: #2c251e;
+  --muted: #74695e;
+  --paper: #f7f1e6;
+  --card: #fffdf8;
+  --red: #8e2f2c;
+  --red-dark: #64201f;
+  --gold: #b98a45;
+  --line: #cfb98f;
+  --shadow: 0 14px 34px rgba(65, 43, 24, 0.11);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--ink);
+  font-family: "Noto Serif SC", "Microsoft YaHei", serif;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(185, 138, 69, 0.13), transparent 28rem),
+    repeating-linear-gradient(0deg, transparent 0 31px, rgba(91, 68, 42, 0.035) 32px),
+    var(--paper);
+}
+
+button, input { font: inherit; }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 2rem clamp(1.25rem, 5vw, 5rem);
+  color: #fff9ed;
+  background: linear-gradient(120deg, var(--red-dark), var(--red));
+  border-bottom: 5px solid var(--gold);
+}
+
+h1 { margin: .1rem 0; font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: .15em; }
+.eyebrow { margin: 0; color: #d9b66c; font-size: .78rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+.subtitle { margin: .35rem 0 0; opacity: .82; }
+
+.privacy-button {
+  flex: 0 0 auto;
+  padding: .7rem 1rem;
+  color: white;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 999px;
+  background: rgba(255,255,255,.1);
+  cursor: pointer;
+}
+
+main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
+
+.notice {
+  max-width: 1100px;
+  margin: 0 auto 1rem;
+  padding: .9rem 1rem;
+  color: #5a4425;
+  border-left: 4px solid var(--gold);
+  background: #fff8dd;
+}
+
+.toolbar {
+  max-width: 1100px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.toolbar label { display: grid; gap: .35rem; color: var(--muted); font-size: .82rem; }
+.global-search-box { position: relative; }
+.toolbar input { width: min(75vw, 22rem); padding: .7rem .85rem; border: 1px solid #d8c7a8; border-radius: .55rem; background: #fffdf8; }
+.stats { color: var(--muted); font-size: .9rem; }
+.search-status { min-height: 1.2rem; margin-top: .25rem; color: var(--red); font-size: .8rem; text-align: right; }
+.search-results { position: absolute; top: calc(100% + .35rem); left: 0; z-index: 50; width: min(92vw, 30rem); max-height: 26rem; overflow-y: auto; padding: .35rem; border: 1px solid #d5c09c; border-radius: .7rem; background: #fffdf8; box-shadow: var(--shadow); }
+.search-result-item { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem .75rem; color: var(--ink); text-align: left; border: 0; border-bottom: 1px solid #eee2cf; background: transparent; cursor: pointer; }
+.search-result-item:hover, .search-result-item:focus { background: #fff2d8; outline: none; }
+.search-result-item span { display: grid; gap: .18rem; }
+.search-result-item small, .search-result-item em { color: var(--muted); font-size: .72rem; font-style: normal; }
+.search-empty { padding: 1.25rem; color: var(--muted); text-align: center; }
+
+.tree-panel { overflow-x: auto; padding: 1rem 0 2rem; }
+.tree-panel { position: relative; min-height: 28rem; max-height: 76vh; overflow: auto; overscroll-behavior: contain; }
+.zoom-toolbar { position: sticky; top: .5rem; left: .5rem; z-index: 20; display: flex; width: max-content; max-width: calc(100vw - 3rem); align-items: center; gap: .35rem; margin: 0 0 .8rem .5rem; padding: .35rem; overflow-x: auto; border: 1px solid #d5c09c; border-radius: .7rem; background: rgba(255, 253, 248, .95); box-shadow: 0 6px 18px rgba(65, 43, 24, .1); backdrop-filter: blur(6px); }
+.zoom-toolbar button { min-width: 2.25rem; height: 2.25rem; padding: 0 .65rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: .45rem; background: white; cursor: pointer; }
+.zoom-toolbar button:hover { border-color: var(--gold); background: #fff8e8; }
+.zoom-tip { padding: 0 .45rem; color: var(--muted); font-size: .75rem; }
+.zoom-slider { width: 9rem; accent-color: var(--red); }
+.zoom-preset { font-size: .75rem; }
+.tree-panel.canvas-locked { cursor: grab; user-select: none; }
+.tree-panel.canvas-locked .tree, .tree-panel.canvas-locked .tree * { cursor: grab; }
+.tree-panel.canvas-locked .zoom-toolbar, .tree-panel.canvas-locked .zoom-toolbar * { cursor: pointer; }
+.tree-panel.canvas-dragging { cursor: grabbing; }
+.tree-panel.canvas-dragging .tree, .tree-panel.canvas-dragging .tree * { cursor: grabbing; }
+.tree-panel.canvas-dragging * { pointer-events: none; }
+.tree { min-width: 1180px; }
+.ancestor-row { display: flex; justify-content: center; position: relative; padding-bottom: 3rem; }
+.ancestor-row::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 3rem; border-left: 2px solid var(--line); }
+
+.branches { display: grid; grid-template-columns: repeat(3, minmax(360px, 1fr)); gap: 1.25rem; position: relative; padding-top: 2.5rem; }
+.branches::before { content: ""; position: absolute; top: 0; left: 8%; right: 8%; border-top: 2px solid var(--line); }
+.branch { position: relative; min-width: 0; padding: 1rem; border: 1px solid #decfb5; border-radius: .8rem; background: rgba(255,253,248,.72); }
+.branch::before { content: ""; position: absolute; top: -2.5rem; left: 50%; height: 2.5rem; border-left: 2px solid var(--line); }
+.branch.pending::before { border-left-style: dashed; }
+.branch h2 { margin: 0 0 .7rem; color: var(--red); text-align: center; font-size: 1rem; }
+.couple { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: .45rem; }
+.descendants { display: flex; align-items: flex-start; gap: .75rem; overflow-x: auto; padding: .1rem .1rem .6rem; }
+.descendant-unit { flex: 0 0 auto; display: grid; grid-template-columns: 142px auto 142px; align-items: stretch; gap: .35rem; }
+.descendant-unit:not(:has(.marriage-link)) { grid-template-columns: 142px; }
+.marriage-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1rem;
+  color: var(--red);
+  font-size: .68rem;
+  font-weight: 700;
+}
+.marriage-link.horizontal {
+  width: 2.4rem;
+  height: auto;
+  flex-direction: column;
+  font-size: .62rem;
+}
+.marriage-link.horizontal::before,
+.marriage-link.horizontal::after {
+  width: 100%;
+  flex: 0 0 auto;
+  margin: .35rem 0;
+}
+.marriage-link::before,
+.marriage-link::after {
+  content: "";
+  flex: 1;
+  margin: 0 .4rem;
+  border-top: 1px solid var(--red);
+}
+.child-label { margin: .9rem 0 .55rem; color: var(--muted); font-size: .7rem; text-align: center; }
+.generated-line { display: grid; gap: .75rem; margin-top: .8rem; padding-top: .7rem; border-top: 1px dashed #d7c29e; }
+.generated-generation { display: grid; justify-items: center; gap: .4rem; }
+.generation-label { margin: 0; color: var(--muted); font-size: .7rem; }
+.generated-unit { width: 100%; grid-template-columns: minmax(132px, 1fr) auto minmax(132px, 1fr); }
+
+.person-card {
+  display: grid;
+  width: 100%;
+  min-height: 7rem;
+  align-content: center;
+  gap: .2rem;
+  padding: .8rem;
+  color: var(--ink);
+  text-align: left;
+  border: 1px solid #d9c39d;
+  border-radius: .65rem;
+  background: var(--card);
+  box-shadow: 0 5px 14px rgba(70,45,20,.07);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.person-card:hover, .person-card:focus-visible { transform: translateY(-2px); box-shadow: var(--shadow); outline: 2px solid var(--gold); }
+.person-card.compact { min-height: 6rem; }
+.person-card strong { font-size: 1.05rem; }
+.person-card small { color: var(--muted); line-height: 1.35; }
+.relation-label { color: var(--red); font-size: .72rem; font-weight: 700; }
+.person-card.match { outline: 3px solid #d7a42e; transform: scale(1.025); }
+.person-card.dimmed { opacity: .27; }
+
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.5rem; color: var(--muted); font-size: .8rem; }
+.legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.dot { width: .75rem; height: .75rem; border-radius: 50%; }
+.dot.real { background: var(--red); }
+.dot.synthetic { background: var(--gold); }
+.line { width: 1.5rem; border-top: 2px solid var(--line); }
+.line.pending { border-top-style: dashed; }
+
+dialog { width: min(92vw, 31rem); padding: 1.7rem; color: var(--ink); border: 1px solid #d5bd93; border-radius: 1rem; background: var(--card); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(26, 18, 12, .58); backdrop-filter: blur(3px); }
+.dialog-close { position: absolute; top: .65rem; right: .75rem; width: 2rem; height: 2rem; border: 0; border-radius: 50%; background: #eee4d2; cursor: pointer; }
+dialog h2 { margin-top: .25rem; }
+dialog li { margin: .65rem 0; line-height: 1.55; }
+dl { display: grid; gap: .25rem; }
+dl div { display: grid; grid-template-columns: 6rem 1fr; padding: .55rem 0; border-bottom: 1px solid #eee2cf; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+.detail-note { padding: .75rem; background: #f7f0e3; border-radius: .5rem; }
+.biography { margin-top: 1rem; padding: .9rem 1rem; border-left: 3px solid var(--gold); background: #faf4e9; }
+.biography h3 { margin: 0 0 .45rem; color: var(--red); font-size: 1rem; }
+.biography p { margin: 0; line-height: 1.7; }
+
+@media (max-width: 650px) {
+  .app-header { align-items: flex-start; padding: 1.4rem 1.1rem; }
+  .toolbar { align-items: stretch; flex-direction: column; }
+  .toolbar input { width: 100%; }
+  .search-status { text-align: left; }
+  .tree { min-width: 760px; }
+  .branches { grid-template-columns: repeat(2, minmax(360px, 1fr)); }
+}
+
+/* v3：规范化父母—子女树 */
+.normalized-tree { min-width: max-content; display: grid; gap: 2rem; }
+.root-family { padding: 1.2rem; border: 1px solid #d5c09c; border-radius: 1rem; background: rgba(255, 253, 248, .78); }
+.root-family > h2 { position: sticky; left: 1rem; width: max-content; margin: 0 0 1.2rem; color: var(--red); font-size: 1.05rem; }
+.family-node { display: grid; justify-items: center; align-content: start; position: relative; padding-top: .75rem; }
+.v3-couple { width: 330px; grid-template-columns: 142px 38px 142px; z-index: 1; }
+.v3-card { width: 142px; min-height: 6.5rem; }
+.synthetic-card { background: #fffaf0; border-style: dashed; }
+.generation-children { display: flex; align-items: flex-start; justify-content: center; gap: 1rem; position: relative; padding: 2.4rem .5rem 0; }
+.generation-children::before { content: ""; position: absolute; top: .8rem; left: 50%; height: 1.6rem; border-left: 2px solid var(--line); }
+.generation-children > .family-node::before { content: ""; position: absolute; top: 0; left: 50%; height: .75rem; border-left: 2px solid var(--line); }
+.generation-children > .family-node::after { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: 2px solid var(--line); }
+.generation-children > .family-node:first-child::after { left: 50%; }
+.generation-children > .family-node:last-child::after { right: 50%; }
+.generation-children > .family-node:only-child::after { display: none; }
+.generation-5 .generation-children { display: none; }
+
+.action-bar { max-width: 1100px; margin: 0 auto 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.action-bar button, .primary-action, .review-actions button { padding: .65rem .9rem; color: var(--red-dark); border: 1px solid #cbaa72; border-radius: .55rem; background: #fffaf0; cursor: pointer; }
+.action-bar .admin-button, .primary-action, .review-actions button:first-child { color: white; border-color: var(--red); background: var(--red); }
+.action-bar p { flex-basis: 100%; min-height: 1.2rem; margin: 0; color: var(--red); font-size: .82rem; }
+.generation-filter { max-width: 1100px; margin: 0 auto .75rem; display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+.generation-filter strong { margin-right: .25rem; color: var(--muted); font-size: .82rem; }
+.generation-filter button { padding: .5rem .75rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: 999px; background: #fffdf8; cursor: pointer; }
+.generation-filter button.active { color: white; border-color: var(--red); background: var(--red); }
+.generation-filter .branch-rule-button { margin-left: auto; border-style: dashed; }
+.generation-filter .branch-rule-button[aria-pressed="true"] { color: white; border-color: #6f5427; background: #6f5427; }
+.relationship-bar { max-width: 1100px; margin: 0 auto 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; padding: .75rem; border: 1px solid #dfcda9; border-radius: .7rem; background: rgba(255,253,248,.8); }
+.relationship-bar strong { color: var(--red); }
+.relationship-bar label { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .82rem; }
+.relationship-bar select, .relationship-bar button { padding: .5rem .65rem; border: 1px solid #d8c7a8; border-radius: .45rem; background: white; }
+.relationship-bar button { color: white; border-color: var(--red); background: var(--red); cursor: pointer; }
+#relationshipStatus { color: var(--muted); font-size: .8rem; }
+.count-badge { display: inline-grid; min-width: 1.25rem; height: 1.25rem; place-items: center; margin-left: .25rem; padding: 0 .25rem; color: var(--red); border-radius: 999px; background: white; font-size: .72rem; }
+.count-badge.empty { opacity: .65; }
+.form-dialog, .review-dialog { width: min(94vw, 42rem); }
+.dialog-intro { color: var(--muted); line-height: 1.55; }
+.member-form { display: grid; gap: .85rem; }
+.member-form label { display: grid; gap: .35rem; color: var(--muted); font-size: .82rem; }
+.member-form input, .member-form select, .member-form textarea { width: 100%; padding: .7rem .8rem; color: var(--ink); border: 1px solid #d8c7a8; border-radius: .5rem; background: white; }
+.member-form textarea { resize: vertical; }
+.review-item { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #eadbc2; }
+.review-item small { display: block; margin-top: .25rem; color: var(--muted); }
+.review-item p { margin: .5rem 0 0; }
+.review-actions { display: flex; align-items: center; gap: .45rem; }
+.review-actions .secondary-action { color: var(--red); background: white; }
+.empty-state { padding: 2rem; color: var(--muted); text-align: center; border: 1px dashed #d8c7a8; border-radius: .65rem; }
+.generation-summary-view { min-width: 100%; display: grid; gap: 1.2rem; }
+.generation-group { padding: 1rem; border: 1px solid #d5c09c; border-radius: .8rem; background: rgba(255, 253, 248, .78); }
+.generation-group h2 { margin: 0 0 .8rem; color: var(--red); font-size: 1rem; }
+.generation-card-row { display: flex; align-items: stretch; gap: 1rem; overflow-x: auto; padding-bottom: .5rem; }
+.generation-card-row .v3-couple { flex: 0 0 330px; }
+.newly-added-focus { outline: 5px solid #27a76f !important; box-shadow: 0 0 0 9px rgba(39, 167, 111, .24), var(--shadow) !important; animation: focus-pulse .8s ease-in-out 3; }
+@keyframes focus-pulse { 50% { transform: scale(1.06); } }
+.branch-boundary-marker { display: none; width: 280px; margin-top: .65rem; padding: .45rem .6rem; color: #6f5427; text-align: center; font-size: .68rem; border: 1px dashed #9b7636; border-radius: .4rem; background: #fff4ce; }
+.show-branch-boundaries .branch-boundary-marker { display: block; }
+
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">H5 单文件版 · 家族内部测试</p>
+      <h1>凌氏家谱</h1>
+      <p class="subtitle">慎终追远 · 记录家族根脉</p>
+    </div>
+    <button id="privacyButton" class="privacy-button" type="button">隐私说明</button>
+  </header>
+
+  <main>
+    <section class="notice">
+      <strong>代际树原型：</strong>去除个人视角称呼；共同先祖为第一代，“玉”字辈为第二代，“永”字辈为第三代。新增人物与生平均为测试数据。
+    </section>
+    <section class="toolbar" aria-label="族谱工具栏">
+      <label class="global-search-box">
+        <span>查找成员</span>
+        <input id="searchInput" type="search" autocomplete="off" placeholder="姓名、拼音首字母或代数">
+        <div id="searchResults" class="search-results" hidden></div>
+      </label>
+      <div>
+        <div class="stats" id="stats"></div>
+        <div class="search-status" id="searchStatus" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+    <section class="action-bar" aria-label="编辑与管理">
+      <button id="addMemberButton" type="button">＋ 添加成员</button>
+      <button id="editMemberButton" type="button">编辑最近查看人物</button>
+      <button id="reviewButton" type="button" class="admin-button">管理员审核 <span id="reviewCount" class="count-badge">0</span></button>
+      <p id="actionStatus" role="status" aria-live="polite"></p>
+    </section>
+    <section class="generation-filter" aria-label="按代查看">
+      <strong>快捷查看</strong>
+      <button type="button" class="active" data-generation="all">全部族谱</button>
+      <button type="button" data-generation="1">第一代</button>
+      <button type="button" data-generation="2">第二代</button>
+      <button type="button" data-generation="3">第三代</button>
+      <button type="button" data-generation="4">第四代</button>
+      <button type="button" data-generation="5">第五代</button>
+      <button id="branchBoundaryButton" type="button" class="branch-rule-button" aria-pressed="false">显示五代分家边界</button>
+    </section>
+    <section class="relationship-bar" aria-label="跨代关系查询">
+      <strong>跨代关系</strong>
+      <label>搜索<input id="relationshipSearch" type="search" placeholder="姓名或首字母，如 LYH"></label>
+      <label>基准成员<select id="relationshipBase"></select></label>
+      <span>与</span>
+      <label>目标代<select id="relationshipTarget"><option value="2">第二代</option><option value="3">第三代</option><option value="4">第四代</option><option value="5">第五代</option></select></label>
+      <button id="showRelationshipButton" type="button">显示关系</button>
+      <span id="relationshipStatus" role="status"></span>
+    </section>
+    <section class="tree-panel">
+      <div class="zoom-toolbar" aria-label="族谱缩放控制">
+        <button id="canvasLockButton" type="button" class="lock-button" aria-pressed="false">✋ 开启拖动</button>
+        <button id="zoomOutButton" type="button" aria-label="缩小族谱">−</button>
+        <button id="zoomResetButton" type="button">重置 <span id="zoomValue">100%</span></button>
+        <button id="zoomInButton" type="button" aria-label="放大族谱">＋</button>
+        <input id="zoomSlider" class="zoom-slider" type="range" min="25" max="160" step="5" value="100" aria-label="缩放比例">
+        <button type="button" class="zoom-preset" data-zoom="0.5">50%</button>
+        <button type="button" class="zoom-preset" data-zoom="0.75">75%</button>
+        <button type="button" class="zoom-preset" data-zoom="1">100%</button>
+        <button id="fitViewButton" type="button">适应视图</button>
+        <span class="zoom-tip">开启后按住左键拖动；Ctrl＋滚轮缩放</span>
+      </div>
+      <div id="tree" class="tree" aria-label="树状族谱"></div>
+    </section>
+    <section class="legend" aria-label="图例">
+      <span><i class="dot real"></i>已有姓名</span>
+      <span><i class="dot synthetic"></i>随机测试信息</span>
+      <span><i class="line pending"></i>关系待确认</span>
+    </section>
+  </main>
+
+  <dialog id="memberDialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <div id="memberDetail"></div>
+  </dialog>
+  <dialog id="privacyDialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <h2>隐私设计方向</h2>
+    <ul>
+      <li>正式版本必须经过微信登录、家族邀请和管理员审核。</li>
+      <li>活着成员的详细资料默认不可见。</li>
+      <li>随机测试内容与真实资料必须分开标记并可一键删除。</li>
+      <li>权限判断必须由 Java 后端完成，不能只在页面隐藏。</li>
+    </ul>
+  </dialog>
+  <dialog id="editDialog" class="form-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <div id="editDialogContent"></div>
+  </dialog>
+  <dialog id="addDialog" class="form-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <div id="addDialogContent"></div>
+  </dialog>
+  <dialog id="reviewDialog" class="review-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <h2>管理员审核</h2>
+    <p class="dialog-intro">批准后才会应用到当前族谱；正式版将由 Java 后端记录审核人和时间。</p>
+    <div id="reviewList"></div>
+  </dialog>
+<script>
+// 规范化族谱测试数据。新增人物均为虚构，仅用于验证产品功能。
+(function () {
+  const people = [];
+  const unions = [];
+  const occupations = ["机械工程师", "教师", "会计", "自动化工程师", "医务工作者", "软件工程师", "设计师", "技术员"];
+  const laterNames = ["承远", "思源", "知行", "启航", "书言", "景初", "浩然", "明川", "星野", "修远", "嘉树", "予安", "泽宇", "博文", "云舟", "悦宁", "清和", "望舒", "致远", "卓然", "亦辰", "宇航", "允诚", "沐阳"];
+  const spouseSurnames = ["王", "李", "张", "刘", "陈", "杨", "赵", "周", "吴", "徐", "孙", "胡"];
+  const spouseNames = ["静怡", "雅文", "若溪", "佳宁", "雨桐", "婉清", "可心", "欣悦", "明哲", "晓彤", "诗雨", "安琪"];
+  let sequence = 0;
+
+  function addPerson(input) {
+    const person = {
+      id: input.id || `person-${++sequence}`,
+      name: input.name,
+      gender: input.gender,
+      generation: input.generation,
+      lineage: input.lineage || "ling",
+      synthetic: Boolean(input.synthetic),
+      birthYear: input.birthYear || "未知",
+      occupation: input.occupation || "未记录",
+      biography: input.biography || "生平资料暂未收集。",
+      fatherId: input.fatherId || null,
+      motherId: input.motherId || null
+    };
+    people.push(person);
+    return person;
+  }
+
+  function addUnion(a, b, children) {
+    unions.push({ id: `union-${unions.length + 1}`, partnerAId: a.id, partnerBId: b.id, childrenIds: children.map((child) => child.id) });
+  }
+
+  function parentsOf(a, b) {
+    return {
+      father: a.gender === "男" ? a : b.gender === "男" ? b : null,
+      mother: a.gender === "女" ? a : b.gender === "女" ? b : null
+    };
+  }
+
+  function generatedBiography(name, occupation) {
+    return `${name}为功能演示生成的测试人物，曾从事${occupation}相关工作，重视家庭教育，也参与整理照片、书信和长辈口述资料。`;
+  }
+
+  function makeLing(name, gender, generation, parents, synthetic, index) {
+    const occupation = occupations[index % occupations.length];
+    return addPerson({
+      name, gender, generation, lineage: "ling", synthetic,
+      birthYear: `${1900 + generation * 27 + (index % 13)}${synthetic ? "（测试）" : "（待考）"}`,
+      occupation: `${occupation}${synthetic ? "（测试）" : "（待补充）"}`,
+      biography: synthetic ? generatedBiography(name, occupation) : `${name}的详细生平仍待家族成员补充。`,
+      fatherId: parents && parents.father ? parents.father.id : null,
+      motherId: parents && parents.mother ? parents.mother.id : null
+    });
+  }
+
+  function makeSpouse(generation, index, gender, fixedName) {
+    const name = fixedName || `${spouseSurnames[index % spouseSurnames.length]}${spouseNames[index % spouseNames.length]}`;
+    const occupation = occupations[(index + 2) % occupations.length];
+    return addPerson({ name, gender, generation, lineage: "external", synthetic: !fixedName, birthYear: `${1930 + generation * 24 + (index % 11)}${fixedName ? "（待考）" : "（测试）"}`, occupation: `${occupation}${fixedName ? "（待补充）" : "（测试）"}`, biography: fixedName ? `${name}的详细生平仍待补充。` : generatedBiography(name, occupation) });
+  }
+
+  function growBelow(parent, spouse, seed, maxGeneration) {
+    if (parent.generation >= maxGeneration) return;
+    const nextGeneration = parent.generation + 1;
+    // 第四代通常1人，少数2人；第五代为1-3人。
+    const childCount = nextGeneration === 4 ? 1 + (seed % 5 === 0 ? 1 : 0) : 1 + (seed % 3);
+    const children = [];
+    for (let i = 0; i < childCount; i += 1) {
+      const index = seed * 3 + i;
+      const gender = index % 3 === 0 ? "女" : "男";
+      const maternalBranchStopsHere = parent.generation === 3 && parent.gender === "女";
+      const husbandSurname = spouse && spouse.name ? spouse.name.charAt(0) : "外";
+      const childName = `${maternalBranchStopsHere ? husbandSurname : "凌"}${laterNames[index % laterNames.length]}`;
+      const child = maternalBranchStopsHere
+        ? addPerson({ name: childName, gender, generation: nextGeneration, lineage: "external", synthetic: true, birthYear: `${1900 + nextGeneration * 27 + (index % 13)}（测试）`, occupation: `${occupations[index % occupations.length]}（测试）`, biography: `${childName}为第三代女性成员的子女，按男方姓氏记录；本族谱只记录至第四代。`, fatherId: parentsOf(parent, spouse).father.id, motherId: parentsOf(parent, spouse).mother.id })
+        : makeLing(childName, gender, nextGeneration, parentsOf(parent, spouse), true, index);
+      children.push(child);
+      if (!maternalBranchStopsHere) {
+        const childSpouse = makeSpouse(nextGeneration, index + 4, gender === "男" ? "女" : "男");
+        if (nextGeneration < maxGeneration) growBelow(child, childSpouse, index + 7, maxGeneration);
+        else addUnion(child, childSpouse, []);
+      }
+    }
+    addUnion(parent, spouse, children);
+  }
+
+  function addKnownMainFamily() {
+    const ancestor = addPerson({ id: "g1-main", name: "凌氏先祖（姓名待考）", gender: "男", generation: 1, lineage: "ling", biography: "现有资料确认其为凌玉禾、凌玉平、凌玉书、凌玉明、凌玉忠、凌玉伟、凌玉鹏和凌玉飞的父亲。" });
+    const ancestorSpouse = addPerson({ id: "g1-main-spouse", name: "配偶（姓名待考）", gender: "女", generation: 1, lineage: "external", biography: "姓名与生平尚待考证；目前不能确认全部第二代成员均为其亲生子女。" });
+    const rows = [
+      ["凌玉禾", "男", "杨文英", "女", ["凌永星", "凌淑瑾"]],
+      ["凌玉平", "男", "李凤荣", "女", ["凌永辉"]],
+      ["凌玉书", "男", "刑贵凤", "女", ["凌永祥"]],
+      ["凌玉明", "男", "宝春杰", "女", ["凌宝"]],
+      ["凌玉忠", "男", "任伟", "女", ["凌雨"]],
+      ["凌玉伟", "男", "王淑艳", "女", ["凌晨", "凌淑珩"]],
+      ["凌玉鹏", "男", "聂晓梅", "女", ["凌浩"]],
+      ["凌玉飞", "男", "王东红", "女", ["凌永琦", "凌珑", "凌舒琪"]],
+      ["凌亚茹", "女", "李学富", "男", ["李小颖", "李明月"]]
+    ];
+    const gen2Children = [];
+    const knownSpouses = { "凌永辉": "董海霞", "凌永祥": "四婶（姓名待考）", "凌宝": "五婶（姓名待考）", "凌雨": "六婶（姓名待考）", "凌淑珩": "乌尔乐", "李小颖": "车（姓名不完整）", "李明月": "张光磊" };
+
+    rows.forEach((row, branchIndex) => {
+      const member = makeLing(row[0], row[1], 2, parentsOf(ancestor, ancestorSpouse), false, branchIndex);
+      const partner = makeSpouse(2, branchIndex, row[3], row[2]);
+      const gen3Children = row[4].map((name, childIndex) => {
+        const femaleNames = ["凌淑瑾", "凌晨", "凌淑珩", "凌珑", "凌舒琪", "李小颖", "李明月"];
+        const gender = femaleNames.includes(name) ? "女" : "男";
+        return addPerson({ name, gender, generation: 3, lineage: name.startsWith("凌") ? "ling" : "external", birthYear: `${1960 + branchIndex * 2 + childIndex}（待考）`, occupation: "待补充", biography: `${name}的详细生平仍待补充。`, fatherId: parentsOf(member, partner).father.id, motherId: parentsOf(member, partner).mother.id });
+      });
+      addUnion(member, partner, gen3Children);
+      gen3Children.filter((child) => child.lineage === "ling").forEach((child, childIndex) => {
+        const spouseName = knownSpouses[child.name];
+        const spouse = makeSpouse(3, branchIndex * 4 + childIndex, child.gender === "男" ? "女" : "男", spouseName);
+        growBelow(child, spouse, branchIndex * 5 + childIndex + 1, 5);
+      });
+      gen2Children.push(member);
+    });
+    addUnion(ancestor, ancestorSpouse, gen2Children);
+  }
+
+  function addSyntheticFirstGeneration(name, spouseName, rootIndex, gen2Count) {
+    const root = addPerson({ name, gender: "男", generation: 1, lineage: "ling", synthetic: true, birthYear: `${1902 + rootIndex * 4}（测试）`, occupation: "农商从业者（测试）", biography: generatedBiography(name, "农商") });
+    const spouse = addPerson({ name: spouseName, gender: "女", generation: 1, lineage: "external", synthetic: true, birthYear: `${1905 + rootIndex * 4}（测试）`, occupation: "家庭教育（测试）", biography: generatedBiography(spouseName, "家庭教育") });
+    const gen2Children = [];
+    for (let i = 0; i < gen2Count; i += 1) {
+      const gender = i === gen2Count - 1 ? "女" : "男";
+      const child = makeLing(`凌玉${laterNames[(rootIndex * 5 + i) % laterNames.length].slice(-1)}`, gender, 2, parentsOf(root, spouse), true, rootIndex * 10 + i);
+      const childSpouse = makeSpouse(2, rootIndex * 10 + i, gender === "男" ? "女" : "男");
+      const gen3Children = [];
+      const gen3Count = 1 + ((rootIndex + i) % 3);
+      for (let j = 0; j < gen3Count; j += 1) {
+        const gen3Gender = (i + j) % 3 === 0 ? "女" : "男";
+        const gen3 = makeLing(`凌永${laterNames[(rootIndex * 7 + i * 2 + j) % laterNames.length].slice(-1)}`, gen3Gender, 3, parentsOf(child, childSpouse), true, rootIndex * 30 + i * 3 + j);
+        const gen3Spouse = makeSpouse(3, rootIndex * 30 + i * 3 + j, gen3Gender === "男" ? "女" : "男");
+        growBelow(gen3, gen3Spouse, rootIndex * 31 + i * 5 + j + 1, 5);
+        gen3Children.push(gen3);
+      }
+      addUnion(child, childSpouse, gen3Children);
+      gen2Children.push(child);
+    }
+    addUnion(root, spouse, gen2Children);
+  }
+
+  addKnownMainFamily();
+  addSyntheticFirstGeneration("凌元德", "许兰芝", 1, 4);
+  addSyntheticFirstGeneration("凌元庆", "韩秀云", 2, 5);
+  window.NORMALIZED_FAMILY_TREE = { people, unions, metadata: { maxGeneration: 5, firstGenerationFamilies: 3 } };
+})();
+
+</script>
+<script>
+(function () {
+  const data = window.NORMALIZED_FAMILY_TREE;
+  const peopleById = new Map(data.people.map((person) => [person.id, person]));
+  const unionByPersonId = new Map();
+  data.unions.forEach((union) => {
+    unionByPersonId.set(union.partnerAId, union);
+    unionByPersonId.set(union.partnerBId, union);
+  });
+
+  const tree = document.querySelector("#tree");
+  const stats = document.querySelector("#stats");
+  const searchInput = document.querySelector("#searchInput");
+  const searchStatus = document.querySelector("#searchStatus");
+  const searchResults = document.querySelector("#searchResults");
+  const memberDialog = document.querySelector("#memberDialog");
+  const memberDetail = document.querySelector("#memberDetail");
+  const privacyDialog = document.querySelector("#privacyDialog");
+  const editDialog = document.querySelector("#editDialog");
+  const addDialog = document.querySelector("#addDialog");
+  const reviewDialog = document.querySelector("#reviewDialog");
+  const editDialogContent = document.querySelector("#editDialogContent");
+  const addDialogContent = document.querySelector("#addDialogContent");
+  const reviewList = document.querySelector("#reviewList");
+  const reviewCount = document.querySelector("#reviewCount");
+  const actionStatus = document.querySelector("#actionStatus");
+  const treePanel = document.querySelector(".tree-panel");
+  const zoomValue = document.querySelector("#zoomValue");
+  const canvasLockButton = document.querySelector("#canvasLockButton");
+  const relationshipBase = document.querySelector("#relationshipBase");
+  const relationshipTarget = document.querySelector("#relationshipTarget");
+  const relationshipStatus = document.querySelector("#relationshipStatus");
+  const branchBoundaryButton = document.querySelector("#branchBoundaryButton");
+  const relationshipSearch = document.querySelector("#relationshipSearch");
+  const zoomSlider = document.querySelector("#zoomSlider");
+  const fitViewButton = document.querySelector("#fitViewButton");
+  let lastViewedPerson = null;
+  let pendingReviews = [];
+  let treeZoom = 1;
+  let canvasLocked = false;
+  let isRightDragging = false;
+  let dragStart = null;
+  let dragPointerId = null;
+  let dragButton = null;
+  let currentSearchMatches = [];
+  let showBranchBoundary = false;
+  const pinyinInitialMap = {
+    凌:"L", 玉:"Y", 禾:"H", 平:"P", 书:"S", 明:"M", 忠:"Z", 伟:"W", 鹏:"P", 飞:"F", 亚:"Y", 茹:"R",
+    永:"Y", 星:"X", 淑:"S", 瑾:"J", 辉:"H", 祥:"X", 宝:"B", 雨:"Y", 晨:"C", 珩:"H", 浩:"H", 琦:"Q", 珑:"L", 舒:"S", 琪:"Q",
+    元:"Y", 德:"D", 庆:"Q", 承:"C", 远:"Y", 思:"S", 源:"Y", 知:"Z", 行:"X", 启:"Q", 航:"H", 言:"Y", 景:"J", 初:"C",
+    然:"R", 川:"C", 野:"Y", 修:"X", 嘉:"J", 树:"S", 予:"Y", 安:"A", 泽:"Z", 宇:"Y", 博:"B", 文:"W", 云:"Y", 舟:"Z", 悦:"Y", 宁:"N", 清:"Q", 和:"H", 望:"W", 致:"Z", 卓:"Z", 亦:"Y", 辰:"C", 允:"Y", 诚:"C", 沐:"M", 阳:"Y"
+  };
+
+  function pinyinInitials(name) {
+    return [...name].map((char) => pinyinInitialMap[char] || (/^[a-z]$/i.test(char) ? char.toUpperCase() : "")).join("");
+  }
+
+  function matchesPersonSearch(person, query) {
+    const normalized = query.trim().toUpperCase();
+    return !normalized || person.name.includes(query.trim()) || pinyinInitials(person.name).includes(normalized);
+  }
+
+  function parentsOf(person) {
+    if (person.lineage !== "ling") return null;
+    return {
+      father: peopleById.get(person.fatherId),
+      mother: peopleById.get(person.motherId)
+    };
+  }
+
+  function partnerOf(person) {
+    const union = unionByPersonId.get(person.id);
+    if (!union) return null;
+    return peopleById.get(union.partnerAId === person.id ? union.partnerBId : union.partnerAId) || null;
+  }
+
+  function showPerson(person) {
+    lastViewedPerson = person;
+    const parents = parentsOf(person);
+    const fatherName = parents && parents.father ? parents.father.name : "未记录";
+    const motherName = parents && parents.mother ? parents.mother.name : "未记录";
+    const partner = partnerOf(person);
+    memberDetail.innerHTML = `
+      <p class="eyebrow">第 ${person.generation} 代${person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 母系后代（随父姓）" : " · 配偶成员"}</p>
+      <h2>${person.name}</h2>
+      <dl>
+        <div><dt>性别</dt><dd>${person.gender}</dd></div>
+        <div><dt>出生年份</dt><dd>${person.birthYear}</dd></div>
+        <div><dt>职业</dt><dd>${person.occupation}</dd></div>
+        <div><dt>配偶</dt><dd>${partner ? partner.name : "未记录"}</dd></div>
+        ${parents ? `<div><dt>父亲</dt><dd>${fatherName}</dd></div><div><dt>母亲</dt><dd>${motherName}</dd></div>` : ""}
+        <div><dt>资料状态</dt><dd>${person.synthetic ? "随机测试资料" : "家族原始记录/待考"}</dd></div>
+      </dl>
+      <section class="biography"><h3>生平简历</h3><p>${person.biography}</p>${parents ? `<p><strong>父母：</strong>${fatherName}、${motherName}</p>` : ""}</section>
+    `;
+    memberDialog.showModal();
+  }
+
+  function personCard(person, relationshipLabel) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `person-card v3-card ${person.synthetic ? "synthetic-card" : ""}`;
+    card.dataset.search = `${person.name} ${pinyinInitials(person.name)} 第${person.generation}代`.toLowerCase();
+    card.dataset.personId = person.id;
+    card.innerHTML = `<span class="relation-label">第 ${person.generation} 代${relationshipLabel ? ` · ${relationshipLabel}` : person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 随父姓" : " · 配偶"}</span><strong>${person.name}</strong><small>${person.birthYear}</small>`;
+    card.addEventListener("click", () => showPerson(person));
+    return card;
+  }
+
+  function coupleElement(person, partner, relationshipLabel) {
+    const unit = document.createElement("div");
+    unit.className = "couple v3-couple";
+    const ordered = [person, partner].filter(Boolean).sort((a, b) => a.gender === b.gender ? 0 : a.gender === "男" ? -1 : 1);
+    ordered.forEach((member, index) => {
+      unit.appendChild(personCard(member, member.id === person.id ? relationshipLabel : ""));
+      if (index === 0 && ordered.length === 2) {
+        const link = document.createElement("div");
+        link.className = "marriage-link horizontal";
+        link.textContent = "夫妻";
+        unit.appendChild(link);
+      }
+    });
+    return unit;
+  }
+
+  function renderFamily(personId) {
+    const person = peopleById.get(personId);
+    const union = unionByPersonId.get(personId);
+    const family = document.createElement("div");
+    family.className = `family-node generation-${person.generation}`;
+    family.appendChild(coupleElement(person, partnerOf(person)));
+    if (union && union.childrenIds.length) {
+      const children = document.createElement("div");
+      children.className = "generation-children";
+      union.childrenIds
+        .map((id) => peopleById.get(id))
+        .sort((a, b) => a.gender === b.gender ? a.name.localeCompare(b.name, "zh-CN") : a.gender === "男" ? -1 : 1)
+        .forEach((child) => children.appendChild(renderFamily(child.id)));
+      family.appendChild(children);
+    }
+    if (person.generation === 5) {
+      const boundary = document.createElement("div");
+      boundary.className = "branch-boundary-marker";
+      boundary.textContent = "五代同谱边界 · 第六代起可建立分支谱";
+      family.appendChild(boundary);
+    }
+    return family;
+  }
+
+  function renderTree() {
+    tree.replaceChildren();
+    tree.classList.add("normalized-tree");
+    const childIds = new Set(data.unions.flatMap((union) => union.childrenIds));
+    const roots = data.people.filter((person) => person.generation === 1 && person.lineage === "ling" && !childIds.has(person.id));
+    roots.forEach((root, index) => {
+      const section = document.createElement("section");
+      section.className = "root-family";
+      const heading = document.createElement("h2");
+      heading.textContent = index === 0 ? "第一代 · 已有主支" : `第一代 · 新增测试支系 ${index}`;
+      section.appendChild(heading);
+      section.appendChild(renderFamily(root.id));
+      tree.appendChild(section);
+    });
+    stats.textContent = `${data.people.length} 位人物 · 5 代 · ${roots.length} 个第一代家庭`;
+    tree.style.zoom = treeZoom;
+    tree.classList.toggle("show-branch-boundaries", showBranchBoundary);
+  }
+
+  function childrenOf(personId) {
+    const union = unionByPersonId.get(personId);
+    return union ? union.childrenIds.map((id) => peopleById.get(id)).filter(Boolean) : [];
+  }
+
+  function descendantsAtGeneration(base, targetGeneration) {
+    const results = [];
+    const queue = childrenOf(base.id).map((person) => ({ person, path: [person] }));
+    while (queue.length) {
+      const current = queue.shift();
+      if (current.person.generation === targetGeneration) results.push(current);
+      else if (current.person.generation < targetGeneration) childrenOf(current.person.id).forEach((child) => queue.push({ person: child, path: [...current.path, child] }));
+    }
+    return results;
+  }
+
+  function crossGenerationLabel(base, target, path) {
+    const gap = target.generation - base.generation;
+    if (gap === 1) return target.gender === "男" ? "儿子" : "女儿";
+    const prefix = path[0] && path[0].gender === "女" ? "外" : "";
+    if (gap === 2) return `${prefix}${target.gender === "男" ? "孙子" : "孙女"}`;
+    if (gap === 3) return `${prefix}${target.gender === "男" ? "曾孙" : "曾孙女"}`;
+    if (gap === 4) return `${prefix}${target.gender === "男" ? "玄孙" : "玄孙女"}`;
+    return `相隔${gap}代后人`;
+  }
+
+  function updateRelationshipBaseOptions(query = "") {
+    const currentValue = relationshipBase.value;
+    relationshipBase.innerHTML = [1, 2, 3, 4].map((generation) => {
+      const options = data.people.filter((person) => person.lineage === "ling" && person.generation === generation && matchesPersonSearch(person, query)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")).map((person) => `<option value="${person.id}">[${pinyinInitials(person.name) || "#"}] ${escapeHtml(person.name)}</option>`).join("");
+      return options ? `<optgroup label="第 ${generation} 代">${options}</optgroup>` : "";
+    }).join("");
+    if ([...relationshipBase.options].some((option) => option.value === currentValue)) relationshipBase.value = currentValue;
+  }
+
+  function showCrossGenerationRelationship() {
+    const base = peopleById.get(relationshipBase.value);
+    const targetGeneration = Number(relationshipTarget.value);
+    if (!base || targetGeneration <= base.generation) {
+      relationshipStatus.textContent = "目标代必须晚于基准成员所在代。";
+      return;
+    }
+    const descendants = descendantsAtGeneration(base, targetGeneration);
+    tree.replaceChildren();
+    tree.classList.remove("normalized-tree");
+    tree.classList.add("generation-summary-view");
+    const section = document.createElement("section");
+    section.className = "generation-group relationship-result";
+    section.innerHTML = `<h2>${escapeHtml(base.name)} → 第${targetGeneration}代</h2>`;
+    const row = document.createElement("div");
+    row.className = "generation-card-row";
+    descendants.forEach(({ person, path }) => row.appendChild(coupleElement(person, partnerOf(person), crossGenerationLabel(base, person, path))));
+    if (!descendants.length) row.innerHTML = '<div class="empty-state">当前资料中没有符合条件的后代。</div>';
+    section.appendChild(row);
+    tree.appendChild(section);
+    stats.textContent = `${base.name}在第${targetGeneration}代有 ${descendants.length} 位已记录后代`;
+    relationshipStatus.textContent = descendants.length ? "已按亲属关系显示。" : "没有找到后代资料。";
+  }
+
+  function firstGenerationAncestor(person) {
+    let current = person;
+    const visited = new Set();
+    while (current && current.generation > 1 && !visited.has(current.id)) {
+      visited.add(current.id);
+      const father = current.fatherId && peopleById.get(current.fatherId);
+      const mother = current.motherId && peopleById.get(current.motherId);
+      current = [father, mother].find((candidate) => candidate && candidate.lineage === "ling") || father || mother;
+    }
+    return current && current.generation === 1 ? current : null;
+  }
+
+  function relationshipToFirst(person) {
+    if (person.generation !== 3) return "";
+    const father = person.fatherId && peopleById.get(person.fatherId);
+    const mother = person.motherId && peopleById.get(person.motherId);
+    const gen2Parent = [father, mother].find((candidate) => candidate && candidate.generation === 2 && candidate.lineage === "ling");
+    if (!gen2Parent) return "第三代成员";
+    if (gen2Parent.gender === "女") return person.gender === "男" ? "外孙" : "外孙女";
+    return person.gender === "男" ? "孙子" : "孙女";
+  }
+
+  function renderGenerationView(generation) {
+    tree.replaceChildren();
+    tree.classList.remove("normalized-tree");
+    tree.classList.add("generation-summary-view");
+    const selected = data.people.filter((person) => (person.lineage === "ling" || person.fatherId || person.motherId) && person.generation === generation);
+    const grouped = new Map();
+    selected.forEach((person) => {
+      const root = firstGenerationAncestor(person) || person;
+      if (!grouped.has(root.id)) grouped.set(root.id, { root, people: [] });
+      grouped.get(root.id).people.push(person);
+    });
+    grouped.forEach(({ root, people: members }) => {
+      const section = document.createElement("section");
+      section.className = "generation-group";
+      const heading = document.createElement("h2");
+      heading.textContent = `第一代：${root.name} · 第${generation}代成员`;
+      section.appendChild(heading);
+      const row = document.createElement("div");
+      row.className = "generation-card-row";
+      members.sort((a, b) => a.gender === b.gender ? a.name.localeCompare(b.name, "zh-CN") : a.gender === "男" ? -1 : 1).forEach((person) => {
+        const unit = coupleElement(person, partnerOf(person));
+        if (generation === 3) {
+          const card = unit.querySelector(`[data-person-id="${person.id}"]`);
+          if (card) card.querySelector(".relation-label").textContent = `第 3 代 · ${relationshipToFirst(person)}`;
+        }
+        row.appendChild(unit);
+      });
+      section.appendChild(row);
+      tree.appendChild(section);
+    });
+    stats.textContent = `第${generation}代：${selected.length} 位成员及其配偶`;
+    tree.style.zoom = treeZoom;
+  }
+
+  function focusPerson(personId) {
+    const card = tree.querySelector(`[data-person-id="${personId}"]`);
+    if (!card) return;
+    card.classList.add("newly-added-focus");
+    card.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    card.focus({ preventScroll: true });
+    window.setTimeout(() => card.classList.remove("newly-added-focus"), 3500);
+  }
+
+  function openSearchResult(personId) {
+    const person = peopleById.get(personId);
+    if (!person) return;
+    if (!tree.querySelector(`[data-person-id="${personId}"]`)) {
+      renderTree();
+      document.querySelectorAll("[data-generation]").forEach((button) => button.classList.toggle("active", button.dataset.generation === "all"));
+    }
+    searchResults.hidden = true;
+    window.setTimeout(() => {
+      focusPerson(personId);
+      showPerson(person);
+    }, 100);
+  }
+
+  function setTreeZoom(nextZoom, pointerX) {
+    const previousZoom = treeZoom;
+    treeZoom = Math.min(1.6, Math.max(.25, Math.round(nextZoom * 20) / 20));
+    if (treeZoom === previousZoom) return;
+    const anchorX = pointerX == null ? treePanel.clientWidth / 2 : pointerX;
+    const logicalX = (treePanel.scrollLeft + anchorX) / previousZoom;
+    tree.style.zoom = treeZoom;
+    treePanel.scrollLeft = logicalX * treeZoom - anchorX;
+    zoomValue.textContent = `${Math.round(treeZoom * 100)}%`;
+    zoomSlider.value = String(Math.round(treeZoom * 100));
+  }
+
+  treePanel.addEventListener("wheel", (event) => {
+    if (event.target.closest(".zoom-toolbar")) return;
+    if (!canvasLocked && !event.ctrlKey) return;
+    event.preventDefault();
+    const panelRect = treePanel.getBoundingClientRect();
+    setTreeZoom(treeZoom + (event.deltaY < 0 ? .05 : -.05), event.clientX - panelRect.left);
+  }, { passive: false });
+
+  function setCanvasLocked(locked) {
+    canvasLocked = locked;
+    treePanel.classList.toggle("canvas-locked", locked);
+    canvasLockButton.setAttribute("aria-pressed", String(locked));
+    canvasLockButton.textContent = locked ? "✋ 拖动模式开启" : "✋ 开启拖动";
+    actionStatus.textContent = locked ? "拖动模式：在族谱空白处按住鼠标左键拖动；也兼容中键和右键。" : "普通模式：Ctrl＋滚轮缩放，普通滚轮滚动。";
+  }
+
+  treePanel.addEventListener("dblclick", (event) => {
+    if (event.target.closest("button, input, select, textarea, .zoom-toolbar")) return;
+    setCanvasLocked(!canvasLocked);
+  });
+  treePanel.addEventListener("contextmenu", (event) => { if (canvasLocked) event.preventDefault(); });
+  treePanel.addEventListener("pointerdown", (event) => {
+    if (!canvasLocked || ![0, 1, 2].includes(event.button)) return;
+    if (event.button === 0 && event.target.closest("button, input, select, textarea, .zoom-toolbar")) return;
+    event.preventDefault();
+    isRightDragging = true;
+    dragPointerId = event.pointerId;
+    dragButton = event.button;
+    dragStart = { x: event.clientX, y: event.clientY, left: treePanel.scrollLeft, top: treePanel.scrollTop };
+    treePanel.classList.add("canvas-dragging");
+    treePanel.setPointerCapture(event.pointerId);
+  }, true);
+  treePanel.addEventListener("pointermove", (event) => {
+    if (!isRightDragging || !dragStart || event.pointerId !== dragPointerId) return;
+    const requiredMask = dragButton === 0 ? 1 : dragButton === 1 ? 4 : 2;
+    if ((event.buttons & requiredMask) === 0) return;
+    event.preventDefault();
+    treePanel.scrollLeft = dragStart.left - (event.clientX - dragStart.x);
+    treePanel.scrollTop = dragStart.top - (event.clientY - dragStart.y);
+  }, true);
+  treePanel.addEventListener("pointerup", (event) => {
+    if (!isRightDragging || event.pointerId !== dragPointerId) return;
+    isRightDragging = false;
+    dragStart = null;
+    dragPointerId = null;
+    dragButton = null;
+    treePanel.classList.remove("canvas-dragging");
+    if (treePanel.hasPointerCapture(event.pointerId)) treePanel.releasePointerCapture(event.pointerId);
+  }, true);
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+  }
+
+  function queueReview(review) {
+    pendingReviews.push({ id: `review-${Date.now()}-${pendingReviews.length}`, submittedAt: new Date().toLocaleString("zh-CN"), ...review });
+    updateReviewBadge();
+    actionStatus.textContent = "申请已提交，等待管理员审核。";
+  }
+
+  function updateReviewBadge() {
+    reviewCount.textContent = pendingReviews.length;
+    reviewCount.classList.toggle("empty", pendingReviews.length === 0);
+  }
+
+  function openEditDialog() {
+    if (!lastViewedPerson) {
+      actionStatus.textContent = "请先点击并查看一位人物，再选择编辑。";
+      return;
+    }
+    editDialogContent.innerHTML = `
+      <h2>申请修改：${escapeHtml(lastViewedPerson.name)}</h2>
+      <form id="editForm" class="member-form">
+        <label>姓名<input name="name" required value="${escapeHtml(lastViewedPerson.name)}"></label>
+        <label>出生年份<input name="birthYear" required value="${escapeHtml(lastViewedPerson.birthYear)}"></label>
+        <label>职业<input name="occupation" required value="${escapeHtml(lastViewedPerson.occupation)}"></label>
+        <label>生平简历<textarea name="biography" rows="5" required>${escapeHtml(lastViewedPerson.biography)}</textarea></label>
+        <label>修改理由<textarea name="reason" rows="2" required placeholder="请说明资料来源或修改原因"></textarea></label>
+        <button type="submit" class="primary-action">提交管理员审核</button>
+      </form>`;
+    editDialogContent.querySelector("#editForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      queueReview({ type: "edit", personId: lastViewedPerson.id, title: `修改 ${lastViewedPerson.name}`, patch: { name: form.get("name"), birthYear: form.get("birthYear"), occupation: form.get("occupation"), biography: form.get("biography") }, reason: form.get("reason") });
+      editDialog.close();
+    });
+    editDialog.showModal();
+  }
+
+  function openAddDialog() {
+    const eligibleParents = data.people.filter((person) => person.lineage === "ling" && person.generation < 5);
+    addDialogContent.innerHTML = `
+      <h2>添加家族成员</h2>
+      <form id="addForm" class="member-form">
+        <label>搜索父母成员<input id="parentSearch" type="search" placeholder="姓名或首字母，如 LYH"></label>
+        <label>父母家庭中的一方<select id="parentSelect" name="parentId" required></select></label>
+        <label>姓名<input name="name" required placeholder="例如：凌某某"></label>
+        <label>性别<select name="gender"><option>男</option><option>女</option></select></label>
+        <label>出生年份<input name="birthYear" required placeholder="例如：1998"></label>
+        <label>职业<input name="occupation" required placeholder="例如：教师"></label>
+        <label>配偶姓名<input name="spouseName" placeholder="没有或未知可留空"></label>
+        <label>生平简历<textarea name="biography" rows="4" required></textarea></label>
+        <label>资料来源<textarea name="reason" rows="2" required placeholder="例如：由本人提供"></textarea></label>
+        <button type="submit" class="primary-action">提交管理员审核</button>
+      </form>`;
+    const parentSelect = addDialogContent.querySelector("#parentSelect");
+    const renderParentOptions = (query = "") => {
+      const oldValue = parentSelect.value;
+      parentSelect.innerHTML = [1, 2, 3, 4].map((generation) => {
+        const options = eligibleParents.filter((person) => person.generation === generation && matchesPersonSearch(person, query)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")).map((person) => `<option value="${person.id}">[${pinyinInitials(person.name) || "#"}] ${escapeHtml(person.name)}</option>`).join("");
+        return options ? `<optgroup label="第 ${generation} 代">${options}</optgroup>` : "";
+      }).join("");
+      if ([...parentSelect.options].some((option) => option.value === oldValue)) parentSelect.value = oldValue;
+    };
+    renderParentOptions();
+    addDialogContent.querySelector("#parentSearch").addEventListener("input", (event) => renderParentOptions(event.target.value));
+    addDialogContent.querySelector("#addForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      queueReview({ type: "add", title: `新增 ${form.get("name")}`, payload: Object.fromEntries(form.entries()), reason: form.get("reason") });
+      addDialog.close();
+    });
+    addDialog.showModal();
+  }
+
+  function approveReview(review) {
+    let approvedPersonId = null;
+    if (review.type === "edit") {
+      const person = peopleById.get(review.personId);
+      if (person) Object.assign(person, review.patch);
+    } else {
+      const parent = peopleById.get(review.payload.parentId);
+      const parentUnion = unionByPersonId.get(parent.id);
+      const partner = partnerOf(parent);
+      const father = parent.gender === "男" ? parent : partner && partner.gender === "男" ? partner : null;
+      const mother = parent.gender === "女" ? parent : partner && partner.gender === "女" ? partner : null;
+      const person = {
+        id: `approved-person-${Date.now()}`,
+        name: review.payload.name,
+        gender: review.payload.gender,
+        generation: parent.generation + 1,
+        lineage: review.payload.name.startsWith("凌") ? "ling" : "external",
+        synthetic: false,
+        birthYear: review.payload.birthYear,
+        occupation: review.payload.occupation,
+        biography: review.payload.biography,
+        fatherId: father ? father.id : null,
+        motherId: mother ? mother.id : null
+      };
+      data.people.push(person);
+      peopleById.set(person.id, person);
+      approvedPersonId = person.id;
+      if (parentUnion) parentUnion.childrenIds.push(person.id);
+      if (review.payload.spouseName) {
+        const spouse = { id: `approved-spouse-${Date.now()}`, name: review.payload.spouseName, gender: person.gender === "男" ? "女" : "男", generation: person.generation, lineage: "external", synthetic: false, birthYear: "未记录", occupation: "未记录", biography: "生平资料暂未收集。", fatherId: null, motherId: null };
+        const union = { id: `approved-union-${Date.now()}`, partnerAId: person.id, partnerBId: spouse.id, childrenIds: [] };
+        data.people.push(spouse); peopleById.set(spouse.id, spouse); data.unions.push(union); unionByPersonId.set(person.id, union); unionByPersonId.set(spouse.id, union);
+      }
+    }
+    pendingReviews = pendingReviews.filter((item) => item.id !== review.id);
+    updateReviewBadge();
+    renderTree();
+    updateRelationshipBaseOptions();
+    document.querySelectorAll("[data-generation]").forEach((button) => button.classList.toggle("active", button.dataset.generation === "all"));
+    renderReviews();
+    actionStatus.textContent = "管理员已批准，族谱已更新。";
+    reviewDialog.close();
+    if (approvedPersonId) window.setTimeout(() => focusPerson(approvedPersonId), 120);
+  }
+
+  function renderReviews() {
+    if (!pendingReviews.length) {
+      reviewList.innerHTML = '<div class="empty-state">目前没有待审核申请。</div>';
+      return;
+    }
+    reviewList.replaceChildren();
+    pendingReviews.forEach((review) => {
+      const item = document.createElement("article");
+      item.className = "review-item";
+      item.innerHTML = `<div><strong>${escapeHtml(review.title)}</strong><small>${escapeHtml(review.submittedAt)}</small><p>${escapeHtml(review.reason || "未填写原因")}</p></div><div class="review-actions"><button type="button" data-action="approve">批准</button><button type="button" data-action="reject" class="secondary-action">驳回</button></div>`;
+      item.querySelector('[data-action="approve"]').addEventListener("click", () => approveReview(review));
+      item.querySelector('[data-action="reject"]').addEventListener("click", () => { pendingReviews = pendingReviews.filter((entry) => entry.id !== review.id); updateReviewBadge(); renderReviews(); actionStatus.textContent = "管理员已驳回申请。"; });
+      reviewList.appendChild(item);
+    });
+  }
+
+  function updateSearch(value) {
+    const query = value.trim();
+    const normalizedQuery = query.toUpperCase();
+    const cards = [...document.querySelectorAll(".person-card")];
+    const matches = cards.filter((card) => query && card.dataset.search.includes(query.toLowerCase()));
+    cards.forEach((card) => {
+      card.classList.toggle("match", matches.includes(card));
+      card.classList.toggle("dimmed", Boolean(query) && !matches.includes(card));
+    });
+    currentSearchMatches = !query ? [] : data.people
+      .filter((person) => person.name.includes(query) || pinyinInitials(person.name).includes(normalizedQuery) || `第${person.generation}代`.includes(query))
+      .sort((a, b) => {
+        const score = (person) => person.name === query ? 0 : pinyinInitials(person.name) === normalizedQuery ? 1 : person.name.startsWith(query) ? 2 : pinyinInitials(person.name).startsWith(normalizedQuery) ? 3 : 4;
+        return score(a) - score(b) || a.generation - b.generation || a.name.localeCompare(b.name, "zh-CN");
+      });
+    searchResults.replaceChildren();
+    currentSearchMatches.slice(0, 15).forEach((person) => {
+      const result = document.createElement("button");
+      result.type = "button";
+      result.className = "search-result-item";
+      const partner = partnerOf(person);
+      result.innerHTML = `<span><strong>${escapeHtml(person.name)}</strong><small>${pinyinInitials(person.name) || "#"} · 第${person.generation}代 · ${person.gender}</small></span><em>${partner ? `配偶：${escapeHtml(partner.name)}` : "无配偶记录"}</em>`;
+      result.addEventListener("click", () => openSearchResult(person.id));
+      searchResults.appendChild(result);
+    });
+    searchResults.hidden = !query;
+    if (query && !currentSearchMatches.length) searchResults.innerHTML = '<div class="search-empty">没有匹配人物</div>';
+    searchStatus.textContent = !query ? "" : currentSearchMatches.length ? `找到 ${currentSearchMatches.length} 位，显示前15位` : "没有找到该成员";
+    return currentSearchMatches;
+  }
+
+  searchInput.addEventListener("input", (event) => updateSearch(event.target.value));
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const match = updateSearch(event.currentTarget.value)[0];
+    if (match) openSearchResult(match.id);
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".global-search-box")) searchResults.hidden = true;
+  });
+  document.querySelector("#privacyButton").addEventListener("click", () => privacyDialog.showModal());
+  document.querySelector("#addMemberButton").addEventListener("click", openAddDialog);
+  document.querySelector("#editMemberButton").addEventListener("click", openEditDialog);
+  document.querySelector("#reviewButton").addEventListener("click", () => { renderReviews(); reviewDialog.showModal(); });
+  document.querySelector("#zoomOutButton").addEventListener("click", () => setTreeZoom(treeZoom - .1));
+  document.querySelector("#zoomInButton").addEventListener("click", () => setTreeZoom(treeZoom + .1));
+  document.querySelector("#zoomResetButton").addEventListener("click", () => setTreeZoom(1));
+  zoomSlider.addEventListener("input", (event) => setTreeZoom(Number(event.target.value) / 100));
+  document.querySelectorAll("[data-zoom]").forEach((button) => button.addEventListener("click", () => setTreeZoom(Number(button.dataset.zoom))));
+  fitViewButton.addEventListener("click", () => {
+    const previousZoom = treeZoom;
+    tree.style.zoom = 1;
+    const naturalWidth = tree.scrollWidth || 1;
+    tree.style.zoom = previousZoom;
+    const fitted = Math.max(.25, Math.min(1, (treePanel.clientWidth - 24) / naturalWidth));
+    setTreeZoom(fitted, 0);
+    treePanel.scrollLeft = 0;
+    treePanel.scrollTop = 0;
+  });
+  canvasLockButton.addEventListener("click", () => setCanvasLocked(!canvasLocked));
+  branchBoundaryButton.addEventListener("click", () => {
+    showBranchBoundary = !showBranchBoundary;
+    branchBoundaryButton.setAttribute("aria-pressed", String(showBranchBoundary));
+    branchBoundaryButton.textContent = showBranchBoundary ? "隐藏五代分家边界" : "显示五代分家边界";
+    tree.classList.toggle("show-branch-boundaries", showBranchBoundary);
+    actionStatus.textContent = showBranchBoundary ? "第一至第五代保持同谱；标记处表示第六代起可以建立分支谱。" : "已隐藏分家边界。";
+  });
+  document.querySelector("#showRelationshipButton").addEventListener("click", showCrossGenerationRelationship);
+  relationshipSearch.addEventListener("input", (event) => updateRelationshipBaseOptions(event.target.value));
+  document.querySelectorAll("[data-generation]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("[data-generation]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+      if (button.dataset.generation === "all") renderTree(); else renderGenerationView(Number(button.dataset.generation));
+    });
+  });
+  document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
+  document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
+  updateReviewBadge();
+  updateRelationshipBaseOptions();
+  renderTree();
+})();
+
+</script>
+</body>
+</html>
