@@ -291,6 +291,10 @@ dd { margin: 0; }
 .explorer-folder::before { content: "▸"; display: inline-block; width: 1.2rem; transition: transform .15s ease; }
 .generation-explorer-level[open] > summary .explorer-folder::before { transform: rotate(90deg); }
 .generation-explorer-content { margin-left: 1.5rem; border-left: 1px solid #d8c7a8; }
+.explorer-generation-2 .generation-explorer-content { margin-left: 2.5rem; }
+.explorer-generation-3 .generation-explorer-content { margin-left: 3.5rem; }
+.explorer-generation-4 .generation-explorer-content { margin-left: 4.5rem; }
+.explorer-generation-5 .generation-explorer-content { margin-left: 5.5rem; }
 .explorer-name-list { display: flex; flex-wrap: wrap; gap: .35rem; padding: .65rem; }
 .explorer-name-list button { padding: .35rem .55rem; color: var(--ink); border: 1px solid #e0d2b9; border-radius: .35rem; background: #fffaf0; cursor: pointer; }
 .explorer-name-list span, .generation-end { padding: .45rem .65rem; color: var(--muted); font-size: .75rem; }
@@ -758,7 +762,7 @@ dd { margin: 0; }
 
   function renderGenerationExplorer() {
     generationExplorer.replaceChildren();
-    const makeLevel = (generation) => {
+    for (let generation = 1; generation <= 5; generation += 1) {
       const people = data.people.filter((person) => person.generation === generation && (person.lineage === "ling" || person.fatherId || person.motherId));
       const details = document.createElement("details");
       details.className = `generation-explorer-level explorer-generation-${generation}`;
@@ -779,12 +783,10 @@ dd { margin: 0; }
       });
       if (people.length > 18) names.insertAdjacentHTML("beforeend", `<span>另有 ${people.length - 18} 位…</span>`);
       content.appendChild(names);
-      if (generation < 5) content.appendChild(makeLevel(generation + 1));
-      else content.insertAdjacentHTML("beforeend", '<div class="generation-end">五代同谱到此 · 第六代起可建立分支谱</div>');
+      if (generation === 5) content.insertAdjacentHTML("beforeend", '<div class="generation-end">五代同谱到此 · 第六代起可建立分支谱</div>');
       details.appendChild(content);
-      return details;
-    };
-    generationExplorer.appendChild(makeLevel(1));
+      generationExplorer.appendChild(details);
+    }
   }
 
   function applyRole(role) {
