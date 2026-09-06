@@ -1,0 +1,109 @@
+'use client';
+
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+
+type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
+type Family = { id:string; name:string; description?:string; join_code:string; source_type:'DATABASE'|'LEGACY_STATIC'; role:Role };
+type Person = { id:string; name:string; gender?:string; generation:number; birth_year?:string; biography?:string; linked_user_id?:string|null };
+type Relation = { id:string; from_person_id:string; to_person_id:string; type:'PARENT'|'CHILD'|'SPOUSE' };
+type Claim = { id:string; person_id:string; status:string; person_name?:string; user_name?:string };
+type Member = { user_id:string; role:Role; display_name?:string; email?:string };
+type Tree = { family:Family; role:Role; people:Person[]; relationships:Relation[]; claims:Claim[]; members:Member[] };
+
+const roleNames:Record<Role,string> = { OWNER:'创建者', ADMIN:'管理员', EDITOR:'编辑成员', VIEWER:'查看成员' };
+const directions = { INITIAL:'初始人物', PARENT:'添加父亲或母亲', CHILD:'添加子女', SPOUSE:'添加配偶' } as const;
+
+async function requestJson<T = any>(url:string, init?:RequestInit):Promise<T> {
+  const response = await fetch(url, init);
+  const data = await response.json().catch(() => ({})) as T & { error?:string };
+  if (!response.ok) throw new Error(data.error || '操作失败');
+  return data;
+}
+
+export default function FamilyPortal() {
+  const [families,setFamilies] = useState<Family[]>([]);
+  const [currentId,setCurrentId] = useState('family-lingshi-existing');
+  const [showFamilies,setShowFamilies] = useState(false);
+  const [tree,setTree] = useState<Tree|null>(null);
+  const [loading,setLoading] = useState(true);
+  const [message,setMessage] = useState('');
+  const [addTarget,setAddTarget] = useState<{direction:keyof typeof directions;reference?:Person}|null>(null);
+  const current = families.find((family) => family.id === currentId) ?? families[0];
+
+  const loadFamilies = async () => {
+    setLoading(true);
+    try {
+      const data = await requestJson<{user:unknown;families:Family[]}>('/api/families');
+      setFamilies(data.families);
+      if (!data.families.some((family:Family) => family.id === currentId)) setCurrentId(data.families[0]?.id ?? '');
+    } catch (error) { setMessage((error as Error).message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void loadFamilies(); }, []);
+  useEffect(() => {
+    if (!current || current.source_type === 'LEGACY_STATIC') { setTree(null); return; }
+    setLoading(true);
+    requestJson<Tree>(`/api/families?family_id=${encodeURIComponent(current.id)}`)
+      .then(setTree).catch((error) => setMessage(error.message)).finally(() => setLoading(false));
+  }, [current?.id]);
+
+  const refreshTree = async () => {
+    if (!current) return;
+    setTree(await requestJson<Tree>(`/api/families?family_id=${encodeURIComponent(current.id)}`));
+  };
+  const createFamily = async (event:FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      const family = await requestJson<Family>('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'CREATE_FAMILY',name:form.get('name'),description:form.get('description')})});
+      await loadFamilies(); setCurrentId(family.id); setMessage('空白族谱已创建，请添加第一位初始人物。'); event.currentTarget.reset();
+    } catch (error) { setMessage((error as Error).message); }
+  };
+  const joinFamily = async (event:FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'JOIN_FAMILY',code:form.get('code')})}); await loadFamilies(); setMessage('已加入族谱。'); event.currentTarget.reset(); }
+    catch (error) { setMessage((error as Error).message); }
+  };
+  const addPerson = async (event:FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!current || !addTarget) return;
+    const form = new FormData(event.currentTarget);
+    try {
+      await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ADD_PERSON',familyId:current.id,direction:addTarget.direction,referencePersonId:addTarget.reference?.id,name:form.get('name'),gender:form.get('gender'),birthYear:form.get('birthYear'),biography:form.get('biography')})});
+      setAddTarget(null); await refreshTree(); setMessage('人物已加入，世代编号已自动重新计算。');
+    } catch (error) { setMessage((error as Error).message); }
+  };
+  const claim = async (personId:string) => {
+    if (!current) return;
+    try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'CLAIM_PERSON',familyId:current.id,personId})}); await refreshTree(); setMessage('认领申请已提交，审核通过后才会关联账号。'); }
+    catch (error) { setMessage((error as Error).message); }
+  };
+  const manage = async (body:Record<string,unknown>) => {
+    if (!current) return;
+    try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...body,familyId:current.id})}); await refreshTree(); setMessage('处理完成。'); }
+    catch (error) { setMessage((error as Error).message); }
+  };
+
+  return <main className="portal">
+    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button></header>
+    {message && <div className="toast" onClick={() => setMessage('')}>{message}<span>×</span></div>}
+    {loading && <div className="loading">正在读取族谱…</div>}
+    {current?.source_type === 'LEGACY_STATIC' && <iframe title="凌氏家谱" src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}
+    {current?.source_type === 'DATABASE' && <DatabaseTree tree={tree} onAdd={setAddTarget} onClaim={claim} onManage={manage} />}
+    {showFamilies && <div className="veil"><section className="family-dialog"><button className="close" onClick={() => setShowFamilies(false)}>×</button><h2>我的族谱</h2><p>一个账号可以加入多本族谱，切换后所有人物与资料互不混用。</p>
+      <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button></article>)}</div>
+      <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button>创建族谱</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>
+    </section></div>}
+    {addTarget && <div className="veil"><form className="person-dialog" onSubmit={addPerson}><button type="button" className="close" onClick={() => setAddTarget(null)}>×</button><h2>{directions[addTarget.direction]}</h2>{addTarget.reference && <p>以 <strong>{addTarget.reference.name}</strong> 为参照添加</p>}<label>姓名<input name="name" required autoFocus /></label><label>性别<input name="gender" placeholder="可自由填写" /></label><label>出生年份<input name="birthYear" inputMode="numeric" /></label><label>人物生平<textarea name="biography" rows={4}/></label><button className="submit">保存人物</button></form></div>}
+  </main>;
+}
+
+function DatabaseTree({tree,onAdd,onClaim,onManage}:{tree:Tree|null;onAdd:(target:{direction:keyof typeof directions;reference?:Person})=>void;onClaim:(id:string)=>void;onManage:(body:Record<string,unknown>)=>void}) {
+  const canEdit = tree && tree.role !== 'VIEWER';
+  const generations = useMemo(() => { const result = new Map<number,Person[]>(); tree?.people.forEach((person) => result.set(person.generation,[...(result.get(person.generation) ?? []),person])); return [...result.entries()].sort((a,b)=>a[0]-b[0]); },[tree]);
+  if (!tree) return null;
+  if (!tree.people.length) return <section className="empty-family"><div className="seal">谱</div><h1>{tree.family.name}</h1><p>这是一本空白族谱。第一位人物只是建立关系的初始人物，并不会被自动标记为始祖。</p>{canEdit?<button onClick={()=>onAdd({direction:'INITIAL'})}>添加第一位初始人物</button>:<p>请联系编辑成员添加第一位人物。</p>}</section>;
+  const relationshipText = (person:Person) => tree.relationships.filter((item)=>item.from_person_id===person.id||item.to_person_id===person.id).map((item)=>{ const otherId=item.from_person_id===person.id?item.to_person_id:item.from_person_id; const other=tree.people.find((one)=>one.id===otherId); return `${item.type==='SPOUSE'?'配偶':item.from_person_id===person.id?'子女':'父母'}：${other?.name??'未知'}`; });
+  return <section className="database-tree"><div className="tree-heading"><span>独立族谱</span><h1>{tree.family.name}</h1><p>加入码：<b>{tree.family.join_code}</b>　权限：{roleNames[tree.role]}</p>{(tree.role==='OWNER'||tree.role==='ADMIN')&&<details className="admin-box"><summary>成员权限与认领审核</summary>{tree.members.map(member=><div className="admin-row" key={member.user_id}><span>{member.display_name||member.email||'族人'} <small>{roleNames[member.role]}</small></span>{tree.role==='OWNER'&&member.role!=='OWNER'&&<select value={member.role} onChange={event=>onManage({action:'SET_MEMBER_ROLE',targetUserId:member.user_id,role:event.target.value})}><option value="ADMIN">管理员</option><option value="EDITOR">编辑成员</option><option value="VIEWER">查看成员</option></select>}</div>)}{tree.claims.filter(claim=>claim.status==='PENDING').map(claim=><div className="admin-row" key={claim.id}><span>{claim.user_name||'族人'} 申请认领 {claim.person_name||'人物'}</span><div><button onClick={()=>onManage({action:'REVIEW_CLAIM',claimId:claim.id,decision:'APPROVED'})}>通过</button><button onClick={()=>onManage({action:'REVIEW_CLAIM',claimId:claim.id,decision:'REJECTED'})}>驳回</button></div></div>)}</details>}</div>{generations.map(([number,people])=><section className="generation" key={number}><h2>第{number}代</h2><div className="people-grid">{people.map((person)=><article className="person-card" key={person.id}><div className="avatar">{person.name.slice(-1)}</div><h3>{person.name}</h3><p>{person.birth_year||'出生年份未录'} · {person.gender||'性别未录'}</p>{person.biography&&<blockquote>{person.biography}</blockquote>}<ul>{relationshipText(person).map((text,index)=><li key={index}>{text}</li>)}</ul><div className="person-actions">{canEdit&&<><button onClick={()=>onAdd({direction:'PARENT',reference:person})}>上添父母</button><button onClick={()=>onAdd({direction:'CHILD',reference:person})}>下添子女</button><button onClick={()=>onAdd({direction:'SPOUSE',reference:person})}>添加配偶</button></>} {!person.linked_user_id&&<button onClick={()=>onClaim(person.id)} disabled={tree.claims.some((claim)=>claim.person_id===person.id&&claim.status==='PENDING')}>{tree.claims.some((claim)=>claim.person_id===person.id&&claim.status==='PENDING')?'认领待审核':'认领本人'}</button>}</div></article>)}</div></section>)}</section>;
+}

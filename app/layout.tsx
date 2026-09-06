@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: '凌氏家谱',
-  description: '家族内部使用的电子族谱网站',
+  title: '我的族谱',
+  description: '支持多本独立族谱的家族资料管理网站',
 };
 
 export default function RootLayout({

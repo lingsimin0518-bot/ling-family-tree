@@ -1066,7 +1066,7 @@ window.installFamilyFeatures = function (api) {
     api.bookCollections.stories = originalBooks.stories.concat(data.people.map(p => ({title:p.name,kicker:`第${p.generation}代 · ${p.synthetic ? '测试资料' : '待核实资料'}`,body:`${parentText(p)}\n配偶：${partnerOf(p)?.name || '未记录'}\n${p.biography}`})));
     tables=buildTables();renderTable();renderMembers();
   }
-  const announcements = [{id:'welcome',title:'【示例公告】家谱资料征集：请核实姓名、亲属关系与人物照片',body:'欢迎族人参与修谱。请在人物详情中提交需要补充的内容，并注明资料来源，由管理员审核。\n这是一条演示公告，可在管理员模式下发布新的家族公告。',date:'2026-09-06',author:'管理员（演示）'}];
+  const announcements = [{id:'welcome',familyId:'family-lingshi-existing',title:'【示例公告】家谱资料征集：请核实姓名、亲属关系与人物照片',body:'欢迎族人参与修谱。请在人物详情中提交需要补充的内容，并注明资料来源，由管理员审核。\n这是一条演示公告，可在管理员模式下发布新的家族公告。',date:'2026-09-06',author:'管理员（演示）'}];
   const activity = [{title:'八代族谱与人物资料整理',body:'族谱已提供八代世系、人物详情和电子书。现有随机测试信息仍需与正式资料区分。',date:'2026-09-06',author:'家谱整理记录'}];
   const communityPanels = {};
   const announcementDialog = el('dialog'); announcementDialog.className = 'community-dialog'; document.body.append(announcementDialog);
@@ -1271,7 +1271,11 @@ window.installFamilyFeatures = function (api) {
     person.deathDate = '';
     person.tombDescription = '演示资料：安葬地点与碑文尚未录入。';
   });
-  window.NORMALIZED_FAMILY_TREE = { people, unions, metadata: { maxGeneration: 8, firstGenerationFamilies: 3 } };
+  // 原有凌氏家谱作为多族谱架构中的一册保留；每条人物与关系均显式标记 familyId。
+  const familyId = "family-lingshi-existing";
+  people.forEach(person => { person.familyId = familyId; });
+  unions.forEach(union => { union.familyId = familyId; });
+  window.NORMALIZED_FAMILY_TREE = { familyId, people, unions, metadata: { familyId, maxGeneration: 8, firstGenerationFamilies: 3 } };
 })();
 
 </script>
