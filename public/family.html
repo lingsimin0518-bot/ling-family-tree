@@ -304,6 +304,23 @@ dd { margin: 0; }
 .view-switcher { position: sticky; top: 0; z-index: 25; display: grid; grid-template-columns: repeat(3, 1fr); max-width: 1100px; margin: 0 auto 1rem; padding: .35rem; border: 1px solid #d5c09c; border-radius: .75rem; background: rgba(255,253,248,.96); box-shadow: 0 8px 22px rgba(65,43,24,.08); }
 .view-switcher button { min-height: 2.8rem; color: var(--red-dark); border: 0; border-radius: .55rem; background: transparent; cursor: pointer; font-weight: 700; }
 .view-switcher button.active { color: white; background: var(--red); }
+.view-switcher { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.member-tools { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:16px 0; }
+.member-tools button,.member-tools select,.member-tools input,.members-panel button,#memberDetail button,.memorial-dialog button { padding:10px 14px; border:1px solid #cbaa72; border-radius:6px; background:#fffaf0; color:#64201f; cursor:pointer; font:inherit; }
+.member-tools input { flex:1; min-width:180px; }
+.member-tools button:disabled { opacity:.4; cursor:default; }
+.members-panel { max-width:1100px; margin:auto; padding:24px; background:#fffdf8; border:1px solid #d5c09c; }
+.members-panel .directory-row { display:flex; gap:20px; align-items:center; width:100%; text-align:left; border:0; border-bottom:1px solid #ded5c7; border-radius:0; background:transparent; }
+.directory-row strong,.directory-row small { display:block; margin:6px 0; }.directory-row small { font-size:14px; color:#74695e; }
+.member-avatar { display:inline-flex; width:72px; height:80px; align-items:center; justify-content:center; flex-shrink:0; border:1px dashed #c5b598; border-radius:6px; background:#ede7dc; color:#74695e; font-size:12px; overflow:hidden; }
+.member-avatar img { width:100%; height:100%; object-fit:cover; }.v3-card .member-avatar { margin-bottom:8px; }
+.profile-heading { display:flex; gap:24px; align-items:center; margin-bottom:20px; }.profile-heading .member-avatar { width:110px; height:120px; }
+.relative-links { display:flex; flex-wrap:wrap; gap:8px; }.profile-biography { white-space:pre-wrap; line-height:1.9; }
+#memberDetail dl div { align-items:start; }#memberDetail dd { overflow-wrap:anywhere; }
+.member-form fieldset { display:grid; gap:12px; border:1px solid #d5c09c; padding:16px; }.member-form fieldset p { font-size:14px; line-height:1.6; }
+.ou-reader { overflow:auto; max-height:850px; padding:18px; background:#67645e; }.ou-page { box-sizing:border-box; min-width:760px; padding:25px; background:white; color:#222; border:4px double #222; }.ou-page h2 { text-align:center; }.ou-page table { width:100%; border-collapse:collapse; table-layout:fixed; }.ou-page th,.ou-page td { border:1px solid #444; padding:8px; vertical-align:top; }.ou-page th { width:45px; }.ou-page td { height:180px; writing-mode:vertical-rl; }.ou-page td span { display:block; margin:4px; font-size:13px; }.ou-page td button { writing-mode:vertical-rl; font:700 17px serif; border:0; background:transparent; cursor:pointer; padding:4px; }.ou-note { font-size:13px; }
+.memorial-dialog { width:min(92vw,650px); background:#f2ede5; color:#3e3128; }.memorial-content { text-align:center; padding:30px 16px; border:3px double #92734f; }.memorial-content .member-avatar { width:130px; height:155px; }.memorial-content form { text-align:left; display:grid; gap:12px; margin-top:22px; }.memorial-content textarea { display:block; width:100%; min-height:100px; padding:10px; font:inherit; }.export-tools { max-width:1100px; margin:12px auto; }.export-tools small { font-size:14px; }
+@media(max-width:600px) { .view-switcher button{font-size:14px;padding:8px 2px}.members-panel{padding:12px}.profile-heading{gap:12px}.directory-row{gap:10px!important}.directory-row small{overflow-wrap:anywhere} }
 [hidden] { display: none !important; }
 .ebook-library { max-width: 900px; margin: 0 auto 2rem; padding: 1.25rem; border: 1px solid #d5c09c; border-radius: .9rem; background: rgba(255,253,248,.9); }
 .ebook-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e5d6bc; }
@@ -370,13 +387,14 @@ dd { margin: 0; }
     </section>
     <nav class="view-switcher" aria-label="族谱浏览方式">
       <button type="button" class="active" data-view="tree">树状族谱</button>
-      <button type="button" data-view="hierarchy">八代导航</button>
+      <button type="button" data-view="hierarchy">欧式表</button>
+      <button type="button" data-view="members">族人列表</button>
       <button type="button" data-view="ebook">族谱电子书</button>
     </nav>
     <section class="generation-explorer-panel view-panel" data-view-panel="hierarchy" aria-labelledby="generationExplorerTitle" hidden>
       <div class="generation-explorer-heading">
-        <div><strong id="generationExplorerTitle">八代层级导航</strong><span>点击箭头逐代展开，直观看清上一代与下一代</span></div>
-        <button id="expandAllGenerations" type="button">全部展开</button>
+        <div><strong id="generationExplorerTitle">欧式表 · 五世接续</strong><span>按父母链纵排，第一至五代与第六至八代接续成页</span></div>
+        <button id="expandAllGenerations" type="button" hidden>全部展开</button>
       </div>
       <div id="generationExplorer" class="generation-explorer"></div>
     </section>
@@ -484,6 +502,137 @@ dd { margin: 0; }
     </div>
     <div id="reviewList"></div>
   </dialog>
+  <script>
+/* Family directory, five-generation tables and member detail workflows. */
+window.installFamilyFeatures = function (api) {
+  const { data, peopleById, partnerOf, childrenOf } = api;
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const el = (tag, text, cls) => { const node = document.createElement(tag); if (text) node.textContent = text; if (cls) node.className = cls; return node; };
+  const button = (text, fn) => { const node = el('button', text); node.type = 'button'; node.addEventListener('click', fn); return node; };
+  const parentText = p => `父：${peopleById.get(p.fatherId)?.name || '未记录'} · 母：${peopleById.get(p.motherId)?.name || '未记录'} · 编号 ${p.id}`;
+  const avatar = p => { const node = el('span', '', 'member-avatar'); if (p.photo && /^data:image\/(jpeg|png|webp);base64,/.test(p.photo)) { const img = el('img'); img.src = p.photo; img.alt = `${p.name}的照片`; node.append(img); } else { node.textContent = '照片待补'; } return node; };
+  let selectedBook = 'lineage';
+  let photoDraft;
+  let listPage = 0;
+  let tablePage = 0;
+  let tables = [];
+  let ascending = false;
+  const originalBooks = Object.fromEntries(Object.entries(api.bookCollections).map(([key,pages]) => [key,pages.slice()]));
+  const memberPanel = el('section', '', 'view-panel members-panel');
+  memberPanel.dataset.viewPanel = 'members'; memberPanel.hidden = true;
+  memberPanel.innerHTML = '<h2>族人列表</h2><div class="member-tools"><input id="directorySearch" type="search" placeholder="搜索姓名、父母姓名或人物编号" aria-label="搜索族人"><select id="directoryLife" aria-label="在世状态"><option value="all">全部成员</option><option value="deceased">已故成员</option><option value="living">在世成员</option><option value="unknown">状态待核实</option></select></div><div id="directoryRows"></div><div id="directoryPages" class="member-tools"></div>';
+  document.querySelector('main').append(memberPanel);
+  const directorySearch = memberPanel.querySelector('input');
+  const directoryLife = memberPanel.querySelector('select');
+  const sortButton = button('顺序：当代 → 先祖', () => { ascending = !ascending; sortButton.textContent = ascending ? '顺序：先祖 → 当代' : '顺序：当代 → 先祖'; listPage = 0; renderMembers(); });
+  memberPanel.querySelector('.member-tools').append(sortButton);
+  [directorySearch, directoryLife].forEach(node => node.addEventListener('input', () => { listPage = 0; renderMembers(); }));
+  function renderMembers() {
+    const q = directorySearch.value.trim();
+    const rows = data.people.filter(p => (!q || `${p.name} ${parentText(p)}`.includes(q)) && (directoryLife.value === 'all' || (p.lifeStatus || 'unknown') === directoryLife.value)).sort((a,b) => (ascending ? a.generation - b.generation : b.generation - a.generation) || a.name.localeCompare(b.name, 'zh-CN'));
+    const count = Math.max(1, Math.ceil(rows.length / 30)); listPage = Math.min(listPage, count - 1);
+    const target = memberPanel.querySelector('#directoryRows'); target.replaceChildren();
+    rows.slice(listPage * 30, (listPage + 1) * 30).forEach(p => {
+      const row = button('', () => api.showPerson(p)); row.className = 'directory-row';
+      const text = el('span'); text.append(el('strong', p.name), el('small', `${p.gender} · 第${p.generation}代 · ${lifeLabel(p)}${p.synthetic ? ' · 测试资料' : ''}`), el('small', parentText(p)));
+      row.append(avatar(p), text); target.append(row);
+    });
+    if (!rows.length) target.append(el('p', '没有符合条件的族人。', 'empty-state'));
+    const pager = memberPanel.querySelector('#directoryPages'); pager.replaceChildren();
+    const prev = button('上一页', () => { listPage--; renderMembers(); }); prev.disabled = listPage === 0;
+    const next = button('下一页', () => { listPage++; renderMembers(); }); next.disabled = listPage >= count - 1;
+    pager.append(prev, el('span', `共 ${rows.length} 人 · ${listPage + 1} / ${count} 页`), next);
+  }
+  function lifeLabel(p) { return p.lifeStatus === 'deceased' ? '已故' : p.lifeStatus === 'living' ? '在世' : '状态待核实'; }
+  function relationLink(p, prefix) { return p ? button(`${prefix}${p.name}`, () => api.showPerson(p)) : el('span', '未记录'); }
+  function showPerson(p) {
+    const dialog = document.querySelector('#memberDialog'); const detail = document.querySelector('#memberDetail'); detail.replaceChildren();
+    const head = el('div', '', 'profile-heading'); const title = el('div'); title.append(el('p', `第${p.generation}代 · ${lifeLabel(p)}`, 'eyebrow'), el('h2', p.name)); head.append(avatar(p), title); detail.append(head);
+    const photoButton = button('添加 / 更换照片', () => { dialog.close(); api.openEditDialog(); }); detail.append(photoButton);
+    if (p.lifeStatus === 'deceased') { const actions = el('div', '', 'member-tools'); actions.append(button('纪念', () => openMemorial(p, 'memorial')), button('陵墓', () => openMemorial(p, 'tomb'))); detail.append(actions); }
+    const dl = el('dl');
+    [['常用名',p.commonName],['别名',p.alias],['性别',p.gender],['出生',p.birthYear],['逝世',p.lifeStatus === 'deceased' ? p.deathDate || '日期待考' : '—'],['职业',p.occupation],['籍贯',p.hometown],['资料状态',p.synthetic ? '随机测试资料' : '家族记录 / 待核实']].forEach(([label,value]) => { const row = el('div'); row.append(el('dt',label),el('dd',value || '未记录')); dl.append(row); });
+    const relatives = [['父亲',[peopleById.get(p.fatherId)]],['母亲',[peopleById.get(p.motherId)]],['配偶',[partnerOf(p)]],['子女',childrenOf(p.id)]];
+    relatives.forEach(([label,people]) => { const row = el('div'); const dd = el('dd','','relative-links'); people.filter(Boolean).forEach(relative => dd.append(relationLink(relative,''))); if (!dd.children.length) dd.textContent = '未记录'; row.append(el('dt',label),dd); dl.append(row); });
+    detail.append(dl,el('h3','行传'),el('p',p.biography || '生平待补充','profile-biography'));
+    const parent = peopleById.get(p.fatherId) || peopleById.get(p.motherId);
+    const siblings = parent ? childrenOf(parent.id).filter(x => x.gender === p.gender) : [];
+    siblings.sort((a,b) => parseInt(a.birthYear,10) - parseInt(b.birthYear,10) || a.name.localeCompare(b.name,'zh-CN'));
+    const rank = siblings.findIndex(x => x.id === p.id);
+    if (rank >= 0) { const row = el('div'); row.append(el('dt','排行'),el('dd',`${['长','次','三','四','五','六','七','八','九'][rank] || `第${rank+1}`}${p.gender === '男' ? '子' : '女'}（按现有资料暂排，待核实）`)); dl.append(row); }
+    detail.append(button('提交修改', () => { dialog.close(); api.openEditDialog(); }));
+    if (!dialog.open) dialog.showModal();
+  }
+  function extendEdit(form, p) {
+    photoDraft = p.photo || '';
+    const extras = el('fieldset'); extras.innerHTML = '<legend>补充人物资料</legend>';
+    [['commonName','常用名'],['alias','别名'],['hometown','籍贯'],['deathDate','逝世日期（未知可留空）'],['tombLocation','陵墓位置'],['tombDescription','陵墓说明']].forEach(([key,label]) => { const l = el('label',label); const input = el('input'); input.name = key; input.value = p[key] || ''; if (key === 'deathDate') input.type = 'date'; l.append(input); extras.append(l); });
+    const life = el('label','在世状态'); const select = el('select'); select.name = 'lifeStatus'; select.innerHTML = '<option value="unknown">待核实</option><option value="living">在世</option><option value="deceased">已故</option>'; select.value = p.lifeStatus || 'unknown'; life.append(select); extras.append(life);
+    const photoLabel = el('label','照片（JPG / PNG / WebP，不超过 5 MB）'); const file = el('input'); file.type = 'file'; file.accept = 'image/jpeg,image/png,image/webp'; photoLabel.append(file); extras.append(photoLabel);
+    const preview = el('div'); preview.append(avatar(p)); extras.append(preview);
+    const status = el('p', '修改和照片经审核后显示；当前演示资料仅保留在本次页面会话。'); status.setAttribute('role','status'); extras.append(status);
+    const submit = form.querySelector('[type="submit"]');
+    file.addEventListener('change', async () => {
+      const imageFile = file.files[0]; if (!imageFile) return;
+      if (!['image/jpeg','image/png','image/webp'].includes(imageFile.type) || imageFile.size > 5 * 1024 * 1024) { status.textContent = '请选择 5 MB 以内的 JPG、PNG 或 WebP 图片。'; file.value = ''; return; }
+      submit.disabled = true; status.textContent = '正在处理照片…';
+      try { const bitmap = await createImageBitmap(imageFile); const canvas = document.createElement('canvas'); const ratio = Math.min(1, 480 / Math.max(bitmap.width,bitmap.height)); canvas.width = Math.round(bitmap.width * ratio); canvas.height = Math.round(bitmap.height * ratio); canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close(); photoDraft = canvas.toDataURL('image/jpeg',.85); preview.replaceChildren(avatar({ ...p, photo: photoDraft })); status.textContent = '照片已准备好，请填写修改理由后提交审核。'; }
+      catch { status.textContent = '图片无法读取，请换一张图片。'; } finally { submit.disabled = false; }
+    });
+    form.insertBefore(extras, submit);
+  }
+  function readEdit(form) { return { commonName:form.get('commonName'), alias:form.get('alias'), hometown:form.get('hometown'), lifeStatus:form.get('lifeStatus'), deathDate:form.get('deathDate'), tombLocation:form.get('tombLocation'), tombDescription:form.get('tombDescription'), photo:photoDraft }; }
+  const memorial = el('dialog','','memorial-dialog'); document.body.append(memorial);
+  const messages = new Map();
+  function openMemorial(p, mode) {
+    if (p.lifeStatus !== 'deceased') return;
+    memorial.replaceChildren(); memorial.append(button('返回人物', () => memorial.close()));
+    const tabs = el('div','','member-tools'); tabs.append(button('纪念馆',() => openMemorial(p,'memorial')), button('陵墓',() => openMemorial(p,'tomb'))); memorial.append(tabs);
+    const content = el('section','','memorial-content'); content.append(avatar(p),el('h2',`${p.name} · ${mode === 'tomb' ? '陵墓' : '纪念馆'}`),el('p',`${p.birthYear || '生年待考'} — ${p.deathDate || '卒年待考'}`));
+    if (mode === 'tomb') { content.append(el('h3','安息之所'),el('p',p.tombLocation || '陵墓位置尚未记录'),el('p',p.tombDescription || '碑文及安葬信息待亲属补充。')); content.append(button('补充陵墓资料', () => { memorial.close(); document.querySelector('#memberDialog').close(); api.openEditDialog(); })); }
+    else { content.append(el('p',p.biography,'profile-biography')); const tribute = el('p','慎终追远，长存思念。'); content.append(button('献一束花', () => { tribute.textContent = '已献花，寄托思念。'; }),tribute); const form = el('form'); form.innerHTML = '<label>寄语<textarea required maxlength="500" placeholder="写下想说的话"></textarea></label><button type="submit">留下寄语</button><small>寄语仅保留在本次页面会话。</small>'; const notes = el('div'); const draw = () => { notes.replaceChildren(); (messages.get(p.id)||[]).forEach(value => notes.append(el('p',value))); }; draw(); form.addEventListener('submit',event => { event.preventDefault(); const value = form.querySelector('textarea').value.trim(); if (!value) return; messages.set(p.id,[...(messages.get(p.id)||[]),value]); form.reset(); draw(); }); content.append(form,notes); }
+    memorial.append(content); if (!memorial.open) memorial.showModal();
+  }
+  function ancestry(p) { const chain = []; const seen = new Set(); while (p && !seen.has(p.id)) { seen.add(p.id); chain.unshift(p); const parents = [peopleById.get(p.fatherId),peopleById.get(p.motherId)].filter(Boolean); p = parents.find(x => x.lineage === 'ling') || parents[0]; } return chain; }
+  function buildTables() {
+    const childIds = new Set(data.unions.flatMap(u => u.childrenIds));
+    const roots = data.people.filter(p => p.generation === 1 && p.lineage === 'ling'); const result = [];
+    roots.forEach(root => {
+      const leaves = data.people.filter(p => childIds.has(p.id) && !childrenOf(p.id).length && ancestry(p)[0]?.id === root.id);
+      for (let start = 1; start <= data.metadata.maxGeneration; start += 5) {
+        const paths = leaves.map(ancestry).filter(path => path.some(p => p.generation >= start));
+        for (let offset = 0; offset < paths.length; offset += 6) {
+          const group = paths.slice(offset, offset + 6); let html = `<section class="ou-page"><h2>凌氏家谱 · 欧式表</h2><p>始祖：${esc(root.name)} · 第${start}—${Math.min(start+4,data.metadata.maxGeneration)}代 · 接续 ${Math.floor(offset/6)+1}</p><table><tbody>`;
+          for (let gen = start; gen <= Math.min(start+4,data.metadata.maxGeneration); gen++) { html += `<tr><th scope="row">第${gen}世</th>`; group.forEach(path => { const p = path.find(x => x.generation === gen); const spouse = p && partnerOf(p); html += p ? `<td><button data-table-person="${esc(p.id)}">${esc(p.name)}</button><span>${esc(p.birthYear)}</span><span>配：${esc(spouse?.name || '未记录')}</span><span>${esc(parentText(p).split(' · 编号')[0])}</span></td>` : '<td>—</td>'; }); html += '</tr>'; }
+          html += '</tbody></table><p class="ou-note">各列沿父母链向下；共同祖先在不同支系重复列出。测试资料须核实。</p></section>'; result.push(html);
+        }
+      }
+    }); return result;
+  }
+  const tablePager = el('div','','member-tools'); document.querySelector('#generationExplorer').before(tablePager);
+  function renderTable() { tablePage = Math.min(tablePage,Math.max(0,tables.length-1)); const target = document.querySelector('#generationExplorer'); target.className = 'ou-reader'; target.innerHTML = tables[tablePage] || '<p>暂无世系资料</p>'; target.querySelectorAll('[data-table-person]').forEach(node => node.addEventListener('click',() => api.showPerson(peopleById.get(node.dataset.tablePerson)))); tablePager.replaceChildren(); const prev = button('上一页',() => {tablePage--;renderTable();});prev.disabled=tablePage===0; const next=button('下一页',()=>{tablePage++;renderTable();});next.disabled=tablePage>=tables.length-1; const jump=el('select');jump.setAttribute('aria-label','选择欧式表页码');tables.forEach((_,i)=>{const option=el('option',`第 ${i+1} 页`);option.value=i;jump.append(option);});jump.value=tablePage;jump.addEventListener('change',()=>{tablePage=Number(jump.value);renderTable();});tablePager.append(prev,el('span',`${tablePage+1} / ${tables.length} 页`),jump,next); }
+  function exportPdf(kind) {
+    const printWindow = window.open('', '_blank'); if (!printWindow) { alert('请允许打开打印窗口后重试。'); return; }
+    let pages = [];
+    if (kind === 'hierarchy') pages = buildTables();
+    if (kind === 'ebook') { pages = api.bookCollections[selectedBook].map(p=>`<section class="print-page"><h1>${esc(p.title)}</h1><p>${esc(p.kicker)}</p><p style="white-space:pre-wrap">${esc(p.body)}</p></section>`); }
+    if (kind === 'tree') { data.unions.filter(u=>u.childrenIds.length).forEach(u=> { const a=peopleById.get(u.partnerAId), b=peopleById.get(u.partnerBId); const card=p=>`<div class="print-person"><b>${esc(p?.name||'未记录')}</b><p>第${p?.generation||'?'}代</p><small>${esc(p?.id||'')}</small></div>`; pages.push(`<section class="print-page"><h2>凌氏家谱 · 家庭树</h2><p>家庭编号 ${esc(u.id)} · 子女按人物编号接续其他页</p><div class="print-couple">${card(a)}<span>夫妻</span>${card(b)}</div><div class="print-children">${u.childrenIds.map(id=>card(peopleById.get(id))).join('')}</div></section>`); }); }
+    const css = document.querySelector('style')?.textContent || '';
+    printWindow.document.open();printWindow.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>凌氏家谱-${esc(kind)}</title><style>${css}\nbody{background:white;margin:0;color:black;font:16px 'Microsoft YaHei',serif} .print-page,.ou-page{break-after:page;padding:12mm;box-sizing:border-box;width:100%;background:white} .print-page p{line-height:1.8} .print-couple,.print-children{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.print-children{border-top:2px solid #755a31;margin-top:30px;padding-top:20px}.print-person{border:1px solid #755a31;padding:15px;min-width:100px}.ou-page table{width:100%}.ou-page td{height:36mm} @page{size:A4 landscape;margin:8mm} .print-controls{padding:20px;background:#fff4da}@media print{.print-controls{display:none}button{color:black;background:none;border:0}.ou-page{box-shadow:none;margin:0}}</style></head><body><div class="print-controls">共 ${pages.length} 页。点击打印，在目标打印机中选择“另存为 PDF”。<button onclick="window.print()">打印 / 保存 PDF</button></div>${pages.join('')}</body></html>`);printWindow.document.close();
+    printWindow.addEventListener('load',()=>printWindow.print(),{once:true});
+  }
+  ['tree','hierarchy','ebook'].forEach(kind=>{ const bar=el('div','','member-tools export-tools');bar.append(button('导出 PDF',()=>exportPdf(kind)),el('small',kind==='tree'?'按家庭分页导出完整族谱':'打印预览中选择“另存为 PDF”'));document.querySelector(`[data-view-panel="${kind}"]`).prepend(bar); });
+  document.querySelectorAll('[data-open-book]').forEach(node=>node.addEventListener('click',()=>{selectedBook=node.dataset.openBook;}));
+  document.querySelector('#ebookDialog .ebook-reader-toolbar').append(button('导出本卷 PDF',()=>exportPdf('ebook')));
+  function render() {
+    api.bookCollections.lineage = originalBooks.lineage.concat(data.unions.filter(u=>u.childrenIds.length).map(u => { const p=peopleById.get(u.partnerAId);return {title:`${p.name}家庭`,kicker:`第${p.generation}代 · ${u.id}`,body:`${parentText(p)}\n配偶：${partnerOf(p)?.name || '未记录'}\n子女：${u.childrenIds.map(id=>peopleById.get(id)?.name).join('、')}`}; }));
+    api.bookCollections.stories = originalBooks.stories.concat(data.people.map(p => ({title:p.name,kicker:`第${p.generation}代 · ${p.synthetic ? '测试资料' : '待核实资料'}`,body:`${parentText(p)}\n配偶：${partnerOf(p)?.name || '未记录'}\n${p.biography}`})));
+    tables=buildTables();renderTable();renderMembers();
+  }
+  return {avatar,showPerson,parentText,extendEdit,readEdit,render};
+};
+
+</script>
 <script>
 // 规范化族谱测试数据。新增人物均为虚构，仅用于验证产品功能。
 (function () {
@@ -633,6 +782,12 @@ dd { margin: 0; }
   addKnownMainFamily();
   addSyntheticFirstGeneration("凌元德", "许兰芝", 1, 4);
   addSyntheticFirstGeneration("凌元庆", "韩秀云", 2, 5);
+  // 仅为虚构始祖提供已故状态，用于纪念馆演示；真实成员状态不作推断。
+  people.filter(person => person.synthetic && person.generation === 1).forEach(person => {
+    person.lifeStatus = 'deceased';
+    person.deathDate = '';
+    person.tombDescription = '演示资料：安葬地点与碑文尚未录入。';
+  });
   window.NORMALIZED_FAMILY_TREE = { people, unions, metadata: { maxGeneration: 8, firstGenerationFamilies: 3 } };
 })();
 
@@ -699,6 +854,7 @@ dd { margin: 0; }
   let showBranchBoundary = false;
   let currentBookPages = [];
   let currentBookPage = 0;
+  let features;
   const pinyinInitialMap = {
     凌:"L", 玉:"Y", 禾:"H", 平:"P", 书:"S", 明:"M", 忠:"Z", 伟:"W", 鹏:"P", 飞:"F", 亚:"Y", 茹:"R",
     永:"Y", 星:"X", 淑:"S", 瑾:"J", 辉:"H", 祥:"X", 宝:"B", 雨:"Y", 晨:"C", 珩:"H", 浩:"H", 琦:"Q", 珑:"L", 舒:"S", 琪:"Q",
@@ -731,6 +887,7 @@ dd { margin: 0; }
 
   function showPerson(person) {
     lastViewedPerson = person;
+    if (features) { features.showPerson(person); return; }
     const parents = parentsOf(person);
     const fatherName = parents && parents.father ? parents.father.name : "未记录";
     const motherName = parents && parents.mother ? parents.mother.name : "未记录";
@@ -757,8 +914,9 @@ dd { margin: 0; }
     card.className = `person-card v3-card ${person.synthetic ? "synthetic-card" : ""}`;
     card.dataset.search = `${person.name} ${pinyinInitials(person.name)} 第${person.generation}代`.toLowerCase();
     card.dataset.personId = person.id;
-    card.innerHTML = `<span class="relation-label">第 ${person.generation} 代${relationshipLabel ? ` · ${relationshipLabel}` : person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 随父姓" : " · 配偶"}</span><strong>${person.name}</strong><small>${person.birthYear}</small>`;
+    card.innerHTML = `<span class="relation-label">第 ${person.generation} 代${relationshipLabel ? ` · ${escapeHtml(relationshipLabel)}` : person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 随父姓" : " · 配偶"}</span><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.birthYear)}</small>`;
     card.addEventListener("click", () => showPerson(person));
+    if (features) card.prepend(features.avatar(person));
     return card;
   }
 
@@ -834,6 +992,7 @@ dd { margin: 0; }
   }
 
   function renderGenerationExplorer() {
+    if (features) { features.render(); return; }
     generationExplorer.replaceChildren();
     for (let generation = 1; generation <= data.metadata.maxGeneration; generation += 1) {
       const people = data.people.filter((person) => person.generation === generation && (person.lineage === "ling" || person.fatherId || person.motherId));
@@ -1121,6 +1280,7 @@ dd { margin: 0; }
   }
 
   function openEditDialog() {
+    if (!currentRole) { loginDialog.showModal(); return; }
     if (!lastViewedPerson) {
       actionStatus.textContent = "请先点击并查看一位人物，再选择编辑。";
       return;
@@ -1138,9 +1298,11 @@ dd { margin: 0; }
     editDialogContent.querySelector("#editForm").addEventListener("submit", (event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
-      queueReview({ type: "edit", personId: lastViewedPerson.id, title: `修改 ${lastViewedPerson.name}`, patch: { name: form.get("name"), birthYear: form.get("birthYear"), occupation: form.get("occupation"), biography: form.get("biography") }, reason: form.get("reason") });
+      const extra = features ? features.readEdit(form) : {};
+      queueReview({ type: "edit", personId: lastViewedPerson.id, title: `修改 ${lastViewedPerson.name}`, patch: { name: form.get("name"), birthYear: form.get("birthYear"), occupation: form.get("occupation"), biography: form.get("biography"), ...extra }, reason: form.get("reason") });
       editDialog.close();
     });
+    if (features) features.extendEdit(editDialogContent.querySelector('#editForm'), lastViewedPerson);
     editDialog.showModal();
   }
 
@@ -1181,6 +1343,7 @@ dd { margin: 0; }
   }
 
   function approveReview(review) {
+    if (currentRole !== 'admin') return;
     let approvedPersonId = null;
     if (review.type === "registration" || review.type === "profile") {
       approvedPersonId = null;
@@ -1238,6 +1401,13 @@ dd { margin: 0; }
       const item = document.createElement("article");
       item.className = "review-item";
       item.innerHTML = `<div><strong>${escapeHtml(review.title)}</strong><small>${escapeHtml(review.submittedAt)}</small><p>${escapeHtml(review.reason || "未填写原因")}</p></div><div class="review-actions"><button type="button" data-action="approve">批准</button><button type="button" data-action="reject" class="secondary-action">驳回</button></div>`;
+      if (review.patch) {
+        const preview = document.createElement('details');
+        const summary = document.createElement('summary'); summary.textContent = '查看提交的资料'; preview.append(summary);
+        Object.entries(review.patch).forEach(([key,value]) => { const row = document.createElement('p'); row.textContent = `${({name:'姓名',birthYear:'出生',occupation:'职业',biography:'行传',lifeStatus:'在世状态',deathDate:'逝世日期',commonName:'常用名',alias:'别名',hometown:'籍贯',tombLocation:'陵墓位置',tombDescription:'陵墓说明',photo:'照片'})[key] || key}：${key === 'photo' ? (value ? '已上传' : '未上传') : value || '未记录'}`; preview.append(row); });
+        if (review.patch.photo && features) preview.append(features.avatar({ name:review.title,photo:review.patch.photo }));
+        item.firstElementChild.append(preview);
+      }
       item.querySelector('[data-action="approve"]').addEventListener("click", () => approveReview(review));
       item.querySelector('[data-action="reject"]').addEventListener("click", () => { pendingReviews = pendingReviews.filter((entry) => entry.id !== review.id); updateReviewBadge(); renderReviews(); actionStatus.textContent = "管理员已驳回申请。"; });
       reviewList.appendChild(item);
@@ -1266,6 +1436,7 @@ dd { margin: 0; }
       result.className = "search-result-item";
       const partner = partnerOf(person);
       result.innerHTML = `<span><strong>${escapeHtml(person.name)}</strong><small>${pinyinInitials(person.name) || "#"} · 第${person.generation}代 · ${person.gender}</small></span><em>${partner ? `配偶：${escapeHtml(partner.name)}` : "无配偶记录"}</em>`;
+      if (features) { const parents = document.createElement('small'); parents.textContent = features.parentText(person); result.querySelector('span').append(parents); }
       result.addEventListener("click", () => openSearchResult(person.id));
       searchResults.appendChild(result);
     });
@@ -1342,6 +1513,7 @@ dd { margin: 0; }
   });
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
+  features = window.installFamilyFeatures({ data, peopleById, partnerOf, childrenOf, showPerson, openEditDialog, queueReview, getRole: () => currentRole, login: () => loginDialog.showModal(), bookCollections, renderTree });
   updateReviewBadge();
   updateRelationshipBaseOptions();
   renderTree();
