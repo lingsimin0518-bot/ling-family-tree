@@ -1364,24 +1364,24 @@ window.installFamilyFeatures = function (api) {
     memberDialog.showModal();
   }
 
-  function personCard(person, relationshipLabel) {
+  function personCard(person, isSpouse = false) {
     const card = document.createElement("button");
     card.type = "button";
     card.className = `person-card v3-card ${person.synthetic ? "synthetic-card" : ""}`;
     card.dataset.search = `${person.name} ${pinyinInitials(person.name)} 第${person.generation}代`.toLowerCase();
     card.dataset.personId = person.id;
-    card.innerHTML = `<span class="relation-label">第 ${person.generation} 代${relationshipLabel ? ` · ${escapeHtml(relationshipLabel)}` : person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 随父姓" : " · 配偶"}</span><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.birthYear)}</small>`;
+    card.innerHTML = `<strong>${escapeHtml(person.name)}</strong><span class="relation-label">第 ${person.generation} 代${isSpouse ? " · 配偶" : ""}</span><small>${escapeHtml(person.birthYear)}</small>`;
     card.addEventListener("click", () => showPerson(person));
     if (features) card.prepend(features.avatar(person));
     return card;
   }
 
-  function coupleElement(person, partner, relationshipLabel) {
+  function coupleElement(person, partner) {
     const unit = document.createElement("div");
     unit.className = "couple v3-couple";
     const ordered = [person, partner].filter(Boolean).sort((a, b) => a.gender === b.gender ? 0 : a.gender === "男" ? -1 : 1);
     ordered.forEach((member, index) => {
-      unit.appendChild(personCard(member, member.id === person.id ? relationshipLabel : ""));
+      unit.appendChild(personCard(member, member.id !== person.id));
       if (index === 0 && ordered.length === 2) {
         const link = document.createElement("div");
         link.className = "marriage-link horizontal";
@@ -1534,16 +1534,6 @@ window.installFamilyFeatures = function (api) {
     return current && current.generation === 1 ? current : null;
   }
 
-  function relationshipToFirst(person) {
-    if (person.generation !== 3) return "";
-    const father = person.fatherId && peopleById.get(person.fatherId);
-    const mother = person.motherId && peopleById.get(person.motherId);
-    const gen2Parent = [father, mother].find((candidate) => candidate && candidate.generation === 2 && candidate.lineage === "ling");
-    if (!gen2Parent) return "第三代成员";
-    if (gen2Parent.gender === "女") return person.gender === "男" ? "外孙" : "外孙女";
-    return person.gender === "男" ? "孙子" : "孙女";
-  }
-
   function generationGapText(difference) {
     if (difference === 0) return '同辈';
     return difference < 0 ? `上一辈${Math.abs(difference) > 1 ? `（相差${Math.abs(difference)}代）` : ''}` : `下一辈${difference > 1 ? `（相差${difference}代）` : ''}`;
@@ -1625,7 +1615,7 @@ window.installFamilyFeatures = function (api) {
       const partner = partnerOf(person);
       rendered.add(person.id);
       if (partner && requested.has(partner.id)) rendered.add(partner.id);
-      units.push(coupleElement(person, partner, person.id === centerId ? '中心人物' : ''));
+      units.push(coupleElement(person, partner));
     });
     return units;
   }
@@ -1710,12 +1700,7 @@ window.installFamilyFeatures = function (api) {
       const row = document.createElement("div");
       row.className = "generation-card-row";
       members.sort((a, b) => a.gender === b.gender ? a.name.localeCompare(b.name, "zh-CN") : a.gender === "男" ? -1 : 1).forEach((person) => {
-        const unit = coupleElement(person, partnerOf(person));
-        if (generation === 3) {
-          const card = unit.querySelector(`[data-person-id="${person.id}"]`);
-          if (card) card.querySelector(".relation-label").textContent = `第 3 代 · ${relationshipToFirst(person)}`;
-        }
-        row.appendChild(unit);
+        row.appendChild(coupleElement(person, partnerOf(person)));
       });
       section.appendChild(row);
       tree.appendChild(section);
