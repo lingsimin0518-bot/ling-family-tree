@@ -93,6 +93,8 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 .search-result-item small, .search-result-item em { color: var(--muted); font-size: .72rem; font-style: normal; }
 .search-empty { padding: 1.25rem; color: var(--muted); text-align: center; }
 .search-match-label { color: var(--red) !important; }
+.search-result-item.homophone-result { background: #fff2d8; }
+.search-result-item.homophone-result .search-match-label::before { content: '≈ '; }
 .person-tree-search { position: relative; }
 .person-tree-search input { padding: .6rem; width: min(65vw, 24rem); border: 1px solid #d8c7a8; border-radius: .45rem; }
 .relationship-bar .search-result-item { background: #fffdf8; color: var(--ink); border: 0; border-bottom: 1px solid #eee2cf; }
@@ -284,8 +286,6 @@ dd { margin: 0; }
 }
 .newly-added-focus { outline: 5px solid #27a76f !important; box-shadow: 0 0 0 9px rgba(39, 167, 111, .24), var(--shadow) !important; animation: focus-pulse .8s ease-in-out 3; }
 @keyframes focus-pulse { 50% { transform: scale(1.06); } }
-.branch-boundary-marker { display: none; width: 280px; margin-top: .65rem; padding: .45rem .6rem; color: #6f5427; text-align: center; font-size: .68rem; border: 1px dashed #9b7636; border-radius: .4rem; background: #fff4ce; }
-.show-branch-boundaries .branch-boundary-marker { display: block; }
 .header-actions { display: flex; align-items: center; gap: .55rem; }
 .header-actions > span { font-size: .78rem; opacity: .85; }
 .role-login-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
@@ -573,7 +573,8 @@ dd { margin: 0; }
     return Infinity;
   }
   const labels = ['姓名匹配', '部分姓名', '拼音匹配', '同音候选（不区分声调）', '近似姓名'];
-  window.FamilyNameSearch = { score, label: (name, query) => labels[score(name, query)] || '', find: (people, query) => people.filter(p => Number.isFinite(score(p.name, query))).sort((a,b) => score(a.name,query)-score(b.name,query) || a.generation-b.generation || a.name.localeCompare(b.name,'zh-CN')) };
+  function initials(name) { return pinyinPro.pinyin(name, { pattern: 'first', toneType: 'none', type: 'array' }).join('').toUpperCase(); }
+  window.FamilyNameSearch = { initials, score, label: (name, query) => labels[score(name, query)] || '', find: (people, query) => people.filter(p => Number.isFinite(score(p.name, query))).sort((a,b) => score(a.name,query)-score(b.name,query) || a.generation-b.generation || a.name.localeCompare(b.name,'zh-CN')) };
 })();
 
 /* Family directory, five-generation tables and member detail workflows. */
@@ -951,8 +952,6 @@ window.installFamilyFeatures = function (api) {
   const treePanel = document.querySelector(".tree-panel");
   const zoomValue = document.querySelector("#zoomValue");
   const canvasLockButton = document.querySelector("#canvasLockButton");
-  const relationshipBase = document.querySelector("#relationshipBase");
-  const relationshipTarget = document.querySelector("#relationshipTarget");
   const relationshipStatus = document.querySelector("#relationshipStatus");
   const branchBoundaryButton = document.querySelector("#branchBoundaryButton");
   const relationshipSearch = document.querySelector("#relationshipSearch");
@@ -981,19 +980,11 @@ window.installFamilyFeatures = function (api) {
   let dragPointerId = null;
   let dragButton = null;
   let currentSearchMatches = [];
-  let showBranchBoundary = false;
   let currentBookPages = [];
   let currentBookPage = 0;
   let features;
-  const pinyinInitialMap = {
-    凌:"L", 玉:"Y", 禾:"H", 平:"P", 书:"S", 明:"M", 忠:"Z", 伟:"W", 鹏:"P", 飞:"F", 亚:"Y", 茹:"R",
-    永:"Y", 星:"X", 淑:"S", 瑾:"J", 辉:"H", 祥:"X", 宝:"B", 雨:"Y", 晨:"C", 珩:"H", 浩:"H", 琦:"Q", 珑:"L", 舒:"S", 琪:"Q",
-    元:"Y", 德:"D", 庆:"Q", 承:"C", 远:"Y", 思:"S", 源:"Y", 知:"Z", 行:"X", 启:"Q", 航:"H", 言:"Y", 景:"J", 初:"C",
-    然:"R", 川:"C", 野:"Y", 修:"X", 嘉:"J", 树:"S", 予:"Y", 安:"A", 泽:"Z", 宇:"Y", 博:"B", 文:"W", 云:"Y", 舟:"Z", 悦:"Y", 宁:"N", 清:"Q", 和:"H", 望:"W", 致:"Z", 卓:"Z", 亦:"Y", 辰:"C", 允:"Y", 诚:"C", 沐:"M", 阳:"Y"
-  };
-
   function pinyinInitials(name) {
-    return [...name].map((char) => pinyinInitialMap[char] || (/^[a-z]$/i.test(char) ? char.toUpperCase() : "")).join("");
+    return window.FamilyNameSearch.initials(name);
   }
 
   function matchesPersonSearch(person, query) {
@@ -1092,12 +1083,6 @@ window.installFamilyFeatures = function (api) {
         .forEach((child) => children.appendChild(renderFamily(child.id, siblingRankLabel(child, siblings))));
       family.appendChild(children);
     }
-    if (person.generation === 5) {
-      const boundary = document.createElement("div");
-      boundary.className = "branch-boundary-marker";
-      boundary.textContent = "五代同谱边界 · 第六代起可建立分支谱";
-      family.appendChild(boundary);
-    }
     return family;
   }
 
@@ -1120,7 +1105,6 @@ window.installFamilyFeatures = function (api) {
     });
     stats.textContent = `${data.people.length} 位人物 · ${data.metadata.maxGeneration} 代 · ${roots.length} 个第一代家庭`;
     tree.style.zoom = treeZoom;
-    tree.classList.toggle("show-branch-boundaries", showBranchBoundary);
     renderGenerationExplorer();
   }
 
@@ -1200,65 +1184,6 @@ window.installFamilyFeatures = function (api) {
     return union ? union.childrenIds.map((id) => peopleById.get(id)).filter(Boolean) : [];
   }
 
-  function descendantsAtGeneration(base, targetGeneration) {
-    const results = [];
-    const queue = childrenOf(base.id).map((person) => ({ person, path: [person] }));
-    while (queue.length) {
-      const current = queue.shift();
-      if (current.person.generation === targetGeneration) results.push(current);
-      else if (current.person.generation < targetGeneration) childrenOf(current.person.id).forEach((child) => queue.push({ person: child, path: [...current.path, child] }));
-    }
-    return results;
-  }
-
-  function crossGenerationLabel(base, target, path) {
-    const gap = target.generation - base.generation;
-    if (!['男','女'].includes(target.gender)) return gap === 1 ? '子女' : `相隔${gap}代后人`;
-    if (gap === 1) return target.gender === "男" ? "儿子" : "女儿";
-    const prefix = path[0] && path[0].gender === "女" ? "外" : "";
-    if (gap === 2) return `${prefix}${target.gender === "男" ? "孙子" : "孙女"}`;
-    if (gap === 3) return `${prefix}${target.gender === "男" ? "曾孙" : "曾孙女"}`;
-    if (gap === 4) return `${prefix}${target.gender === "男" ? "玄孙" : "玄孙女"}`;
-    if (gap === 5) return `${prefix}${target.gender === "男" ? "来孙" : "来孙女"}`;
-    if (gap === 6) return `${prefix}${target.gender === "男" ? "晜孙" : "晜孙女"}`;
-    if (gap === 7) return `${prefix}${target.gender === "男" ? "仍孙" : "仍孙女"}`;
-    return `相隔${gap}代后人`;
-  }
-
-  function updateRelationshipBaseOptions(query = "") {
-    const currentValue = relationshipBase.value;
-    relationshipBase.innerHTML = Array.from({ length: data.metadata.maxGeneration - 1 }, (_, index) => index + 1).map((generation) => {
-      const options = data.people.filter((person) => person.lineage === "ling" && person.generation === generation && matchesPersonSearch(person, query)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")).map((person) => `<option value="${person.id}">[${pinyinInitials(person.name) || "#"}] ${escapeHtml(person.name)}</option>`).join("");
-      return options ? `<optgroup label="第 ${generation} 代">${options}</optgroup>` : "";
-    }).join("");
-    if ([...relationshipBase.options].some((option) => option.value === currentValue)) relationshipBase.value = currentValue;
-  }
-
-  function showCrossGenerationRelationship() {
-    const base = peopleById.get(relationshipBase.value);
-    const targetGeneration = Number(relationshipTarget.value);
-    if (!base || targetGeneration <= base.generation) {
-      relationshipStatus.textContent = "目标代必须晚于基准成员所在代。";
-      return;
-    }
-    const descendants = descendantsAtGeneration(base, targetGeneration);
-    tree.replaceChildren();
-    tree.classList.remove("normalized-tree");
-    tree.classList.add("generation-summary-view");
-    enableQuickView();
-    const section = document.createElement("section");
-    section.className = "generation-group relationship-result";
-    section.innerHTML = `<h2>${escapeHtml(base.name)} → 第${targetGeneration}代</h2>`;
-    const row = document.createElement("div");
-    row.className = "generation-card-row";
-    descendants.forEach(({ person, path }) => row.appendChild(coupleElement(person, partnerOf(person), crossGenerationLabel(base, person, path))));
-    if (!descendants.length) row.innerHTML = '<div class="empty-state">当前资料中没有符合条件的后代。</div>';
-    section.appendChild(row);
-    tree.appendChild(section);
-    stats.textContent = `${base.name}在第${targetGeneration}代有 ${descendants.length} 位已记录后代`;
-    relationshipStatus.textContent = descendants.length ? "已按亲属关系显示。" : "没有找到后代资料。";
-  }
-
   function firstGenerationAncestor(person) {
     let current = person;
     const visited = new Set();
@@ -1283,11 +1208,11 @@ window.installFamilyFeatures = function (api) {
 
   function renderMiniTree(person) {
     lastViewedPerson = person;
+    activateView('tree');
     tree.replaceChildren();
     tree.classList.remove('normalized-tree');
     tree.classList.add('generation-summary-view');
     enableQuickView();
-    document.querySelector('[data-view="tree"]')?.click();
     document.querySelectorAll('[data-generation]').forEach(button => button.classList.remove('active'));
     const section = document.createElement('section');
     section.className = 'generation-group mini-family-tree';
@@ -1315,13 +1240,7 @@ window.installFamilyFeatures = function (api) {
     const results = document.querySelector('#relationshipResults'); results.replaceChildren();
     const found = window.FamilyNameSearch.find(data.people, query);
     found.forEach(person => {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'search-result-item';
-      const details = document.createElement('span');
-      const name = document.createElement('strong'); name.textContent = person.name;
-      const meta = document.createElement('small'); meta.textContent = `第${person.generation}代 · ${window.FamilyNameSearch.label(person.name, query)}`;
-      const parents = document.createElement('small'); parents.textContent = features.parentText(person);
-      details.append(name, meta, parents); button.append(details);
-      button.addEventListener('click', () => { relationshipSearch.value = person.name; renderMiniTree(person); }); results.append(button);
+      results.append(searchResultButton(person, query, () => { relationshipSearch.value = person.name; renderMiniTree(person); }));
     });
     results.hidden = !query;
     if (query && !found.length) { const empty = document.createElement('p'); empty.className = 'search-empty'; empty.textContent = '没有找到姓名或同音候选'; results.append(empty); }
@@ -1598,7 +1517,6 @@ window.installFamilyFeatures = function (api) {
     if (review.type === 'add' || review.type === 'edit') features.recordActivity(review);
     updateReviewBadge();
     renderTree();
-    updateRelationshipBaseOptions();
     document.querySelectorAll("[data-generation]").forEach((button) => button.classList.toggle("active", button.dataset.generation === "all"));
     renderReviews();
     actionStatus.textContent = "管理员已批准，族谱已更新。";
@@ -1642,31 +1560,34 @@ window.installFamilyFeatures = function (api) {
 
   function updateSearch(value) {
     const query = value.trim();
-    const normalizedQuery = query.toUpperCase();
     const cards = [...document.querySelectorAll(".person-card")];
-    const matches = cards.filter((card) => query && card.dataset.search.includes(query.toLowerCase()));
-    cards.forEach((card) => {
-      card.classList.toggle("match", matches.includes(card));
-      card.classList.toggle("dimmed", Boolean(query) && !matches.includes(card));
-    });
     currentSearchMatches = /^第\d+代$/.test(query) ? data.people.filter(p => `第${p.generation}代` === query) : window.FamilyNameSearch.find(data.people, query);
     cards.forEach(card => { const matched = currentSearchMatches.some(p => p.id === card.dataset.personId); card.classList.toggle('match', matched); card.classList.toggle('dimmed', Boolean(query) && !matched); });
     searchResults.replaceChildren();
     currentSearchMatches.slice(0, 15).forEach((person) => {
-      const result = document.createElement("button");
-      result.type = "button";
-      result.className = "search-result-item";
-      const partner = partnerOf(person);
-      result.innerHTML = `<span><strong>${escapeHtml(person.name)}</strong><small>${pinyinInitials(person.name) || "#"} · 第${person.generation}代 · ${person.gender}</small></span><em>${partner ? `配偶：${escapeHtml(partner.name)}` : "无配偶记录"}</em>`;
-      if (features) { const parents = document.createElement('small'); parents.textContent = features.parentText(person); result.querySelector('span').append(parents); }
-      const matchLabel = document.createElement('small'); matchLabel.className = 'search-match-label'; matchLabel.textContent = window.FamilyNameSearch.label(person.name, query); result.querySelector('span').append(matchLabel);
-      result.addEventListener("click", () => openSearchResult(person.id));
-      searchResults.appendChild(result);
+      searchResults.appendChild(searchResultButton(person, query, () => openSearchResult(person.id), true));
     });
     searchResults.hidden = !query;
     if (query && !currentSearchMatches.length) searchResults.innerHTML = '<div class="search-empty">没有匹配人物</div>';
     searchStatus.textContent = !query ? "" : currentSearchMatches.length ? `找到 ${currentSearchMatches.length} 位，显示前15位` : "没有找到该成员";
     return currentSearchMatches;
+  }
+
+  function searchResultButton(person, query, onSelect, showPartner = false) {
+    const result = document.createElement('button');
+    result.type = 'button';
+    result.className = 'search-result-item';
+    const label = window.FamilyNameSearch.label(person.name, query);
+    if (label.startsWith('同音')) result.classList.add('homophone-result');
+    const details = document.createElement('span');
+    const name = document.createElement('strong'); name.textContent = person.name;
+    const meta = document.createElement('small'); meta.textContent = `${pinyinInitials(person.name) || '#'} · 第${person.generation}代 · ${person.gender}`;
+    const parents = document.createElement('small'); parents.textContent = features ? features.parentText(person) : '';
+    const match = document.createElement('small'); match.className = 'search-match-label'; match.textContent = label;
+    details.append(name, meta, parents, match); result.append(details);
+    if (showPartner) { const partner = partnerOf(person); const spouse = document.createElement('em'); spouse.textContent = partner ? `配偶：${partner.name}` : '无配偶记录'; result.append(spouse); }
+    result.addEventListener('click', onSelect);
+    return result;
   }
 
   searchInput.addEventListener("input", (event) => updateSearch(event.target.value));
@@ -1686,10 +1607,11 @@ window.installFamilyFeatures = function (api) {
   document.querySelector("#editMemberButton").addEventListener("click", openEditDialog);
   reviewButton.addEventListener("click", () => { if (currentRole !== "admin") return; renderReviews(); reviewDialog.showModal(); });
   loginButton.addEventListener("click", () => loginDialog.showModal());
-  document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => {
-    document.querySelectorAll("[data-view]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
-    document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== button.dataset.view; });
-  }));
+  function activateView(view) {
+    document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
+    document.querySelectorAll('[data-view-panel]').forEach(panel => { panel.hidden = panel.dataset.viewPanel !== view; });
+  }
+  document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => activateView(button.dataset.view)));
   document.querySelectorAll("[data-open-book]").forEach((button) => button.addEventListener("click", () => openBook(button.dataset.openBook)));
   document.querySelector("#previousBookPage").addEventListener("click", () => { if (currentBookPage > 0) { currentBookPage -= 1; renderBookPage(); } });
   document.querySelector("#nextBookPage").addEventListener("click", () => { if (currentBookPage < currentBookPages.length - 1) { currentBookPage += 1; renderBookPage(); } });
