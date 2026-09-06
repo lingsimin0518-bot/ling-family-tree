@@ -256,6 +256,9 @@ dd { margin: 0; }
 .review-item p { margin: .5rem 0 0; }
 .review-actions { display: flex; align-items: center; gap: .45rem; }
 .review-actions .secondary-action { color: var(--red); background: white; }
+.review-change { margin:12px 0;padding:12px;border-left:3px solid #b62020;background:#fff5f3;overflow-wrap:anywhere;white-space:pre-wrap; }
+.review-change > strong,.review-after { color:#b62020;font-weight:600; }
+.review-before { color:#74695e; }
 .empty-state { padding: 2rem; color: var(--muted); text-align: center; border: 1px dashed #d8c7a8; border-radius: .65rem; }
 .generation-summary-view { min-width: 100%; display: grid; gap: 1.2rem; }
 .generation-group { padding: 1rem; border: 1px solid #d5c09c; border-radius: .8rem; background: rgba(255, 253, 248, .78); }
@@ -583,11 +586,12 @@ window.installFamilyFeatures = function (api) {
     const siblings = parent ? childrenOf(parent.id).filter(x => x.gender === p.gender) : [];
     siblings.sort((a,b) => parseInt(a.birthYear,10) - parseInt(b.birthYear,10) || a.name.localeCompare(b.name,'zh-CN'));
     const rank = siblings.findIndex(x => x.id === p.id);
-    if (rank >= 0) { const row = el('div'); row.append(el('dt','排行'),el('dd',`${['长','次','三','四','五','六','七','八','九'][rank] || `第${rank+1}`}${p.gender === '男' ? '子' : '女'}（按现有资料暂排，待核实）`)); dl.append(row); }
+    if (rank >= 0 && ['男','女'].includes(p.gender)) { const row = el('div'); row.append(el('dt','排行'),el('dd',`${['长','次','三','四','五','六','七','八','九'][rank] || `第${rank+1}`}${p.gender === '男' ? '子' : '女'}（按现有资料暂排，待核实）`)); dl.append(row); }
     detail.append(button('提交修改', () => { dialog.close(); api.openEditDialog(); }));
     if (!dialog.open) dialog.showModal();
   }
   function extendEdit(form, p) {
+    genderInput(form, p.gender);
     photoDraft = p.photo || '';
     const extras = el('fieldset'); extras.innerHTML = '<legend>补充人物资料</legend>';
     [['commonName','常用名'],['alias','别名'],['hometown','籍贯'],['deathDate','逝世日期（未知可留空）'],['tombLocation','陵墓位置'],['tombDescription','陵墓说明']].forEach(([key,label]) => { const l = el('label',label); const input = el('input'); input.name = key; input.value = p[key] || ''; if (key === 'deathDate') input.type = 'date'; l.append(input); extras.append(l); });
@@ -605,7 +609,17 @@ window.installFamilyFeatures = function (api) {
     });
     form.insertBefore(extras, submit);
   }
-  function readEdit(form) { return { commonName:form.get('commonName'), alias:form.get('alias'), hometown:form.get('hometown'), lifeStatus:form.get('lifeStatus'), deathDate:form.get('deathDate'), tombLocation:form.get('tombLocation'), tombDescription:form.get('tombDescription'), photo:photoDraft }; }
+  function genderInput(form, current = '男') {
+    let select = form.querySelector('[name="gender"]');
+    if (!select) { const label = el('label','性别'); select=el('select');select.name='gender';label.append(select);form.prepend(label); }
+    select.innerHTML='<option value="男">男</option><option value="女">女</option><option value="custom">自定义（自由填写）</option>';
+    const label=el('label','自定义性别');const input=el('input');input.name='customGender';input.maxLength=30;input.placeholder='请填写性别信息';label.append(input);select.parentElement.after(label);
+    select.value=['男','女'].includes(current)?current:'custom';input.value=select.value==='custom'?(current||''):'';
+    const sync=()=>{label.hidden=select.value!=='custom';input.disabled=label.hidden;input.required=!label.hidden;};select.addEventListener('change',sync);sync();
+    input.addEventListener('input',()=>input.setCustomValidity(input.value.trim()?'':'请填写性别信息'));
+  }
+  function readGender(form) { return form.get('gender')==='custom' ? String(form.get('customGender')||'').trim() : form.get('gender'); }
+  function readEdit(form) { return { gender:readGender(form), commonName:form.get('commonName'), alias:form.get('alias'), hometown:form.get('hometown'), lifeStatus:form.get('lifeStatus'), deathDate:form.get('deathDate'), tombLocation:form.get('tombLocation'), tombDescription:form.get('tombDescription'), photo:photoDraft }; }
   const memorial = el('dialog','','memorial-dialog'); document.body.append(memorial);
   const messages = new Map();
   function openMemorial(p, mode) {
@@ -699,7 +713,7 @@ window.installFamilyFeatures = function (api) {
   const approveActivity = review => {activity.unshift({...review.payload,date:new Date().toLocaleString('zh-CN')});renderCommunity();};
   const recordActivity = review => { activity.unshift({title:review.title,body:'人物资料申请已通过管理员审核，族谱已更新。',date:new Date().toLocaleString('zh-CN'),author:'审核记录'});renderCommunity(); };
   renderCommunity();
-  return {avatar,showPerson,parentText,extendEdit,readEdit,render,renderCommunity,approveActivity,recordActivity};
+  return {avatar,showPerson,parentText,extendEdit,readEdit,genderInput,readGender,render,renderCommunity,approveActivity,recordActivity};
 };
 
 </script>
@@ -1007,6 +1021,7 @@ window.installFamilyFeatures = function (api) {
   }
 
   function siblingRankLabel(person, siblings) {
+    if (!['男','女'].includes(person.gender)) return '子女（排行待核实）';
     const sameGender = siblings
       .filter((item) => item.gender === person.gender)
       .sort((a, b) => Number.parseInt(a.birthYear, 10) - Number.parseInt(b.birthYear, 10) || a.name.localeCompare(b.name, "zh-CN"));
@@ -1150,6 +1165,7 @@ window.installFamilyFeatures = function (api) {
 
   function crossGenerationLabel(base, target, path) {
     const gap = target.generation - base.generation;
+    if (!['男','女'].includes(target.gender)) return gap === 1 ? '子女' : `相隔${gap}代后人`;
     if (gap === 1) return target.gender === "男" ? "儿子" : "女儿";
     const prefix = path[0] && path[0].gender === "女" ? "外" : "";
     if (gap === 2) return `${prefix}${target.gender === "男" ? "孙子" : "孙女"}`;
@@ -1340,6 +1356,12 @@ window.installFamilyFeatures = function (api) {
   }
 
   function queueReview(review) {
+    if (review.type === 'edit') {
+      const original = peopleById.get(review.personId);
+      review.before = Object.fromEntries(Object.keys(review.patch).map(key => [key, original?.[key] ?? (key === 'lifeStatus' ? 'unknown' : '')]));
+      review.patch = Object.fromEntries(Object.entries(review.patch).filter(([key,value]) => String(value ?? '') !== String(review.before[key])));
+      if (!Object.keys(review.patch).length) { actionStatus.textContent = '未检测到资料变化，无需提交审核。'; return; }
+    }
     pendingReviews.push({ id: `review-${Date.now()}-${pendingReviews.length}`, category: "profile", submittedAt: new Date().toLocaleString("zh-CN"), ...review });
     updateReviewBadge();
     actionStatus.textContent = "申请已提交，等待管理员审核。";
@@ -1407,9 +1429,12 @@ window.installFamilyFeatures = function (api) {
     addDialogContent.querySelector("#addForm").addEventListener("submit", (event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
-      queueReview({ type: "add", title: `新增 ${form.get("name")}`, payload: Object.fromEntries(form.entries()), reason: form.get("reason") });
+      const payload = Object.fromEntries(form.entries());
+      payload.gender = features.readGender(form); delete payload.customGender;
+      queueReview({ type: "add", title: `新增 ${form.get("name")}`, payload, reason: form.get("reason") });
       addDialog.close();
     });
+    features.genderInput(addDialogContent.querySelector('#addForm'));
     addDialog.showModal();
   }
 
@@ -1447,7 +1472,7 @@ window.installFamilyFeatures = function (api) {
       approvedPersonId = person.id;
       if (parentUnion) parentUnion.childrenIds.push(person.id);
       if (review.payload.spouseName) {
-        const spouse = { id: `approved-spouse-${Date.now()}`, name: review.payload.spouseName, gender: person.gender === "男" ? "女" : "男", generation: person.generation, lineage: "external", synthetic: false, birthYear: "未记录", occupation: "未记录", biography: "生平资料暂未收集。", fatherId: null, motherId: null };
+        const spouse = { id: `approved-spouse-${Date.now()}`, name: review.payload.spouseName, gender: person.gender === "男" ? "女" : person.gender === '女' ? '男' : '待核实', generation: person.generation, lineage: "external", synthetic: false, birthYear: "未记录", occupation: "未记录", biography: "生平资料暂未收集。", fatherId: null, motherId: null };
         const union = { id: `approved-union-${Date.now()}`, partnerAId: person.id, partnerBId: spouse.id, childrenIds: [] };
         data.people.push(spouse); peopleById.set(spouse.id, spouse); data.unions.push(union); unionByPersonId.set(person.id, union); unionByPersonId.set(spouse.id, union);
       }
@@ -1478,7 +1503,17 @@ window.installFamilyFeatures = function (api) {
       if (review.patch) {
         const preview = document.createElement('details');
         const summary = document.createElement('summary'); summary.textContent = '查看提交的资料'; preview.append(summary);
-        Object.entries(review.patch).forEach(([key,value]) => { const row = document.createElement('p'); row.textContent = `${({name:'姓名',birthYear:'出生',occupation:'职业',biography:'行传',lifeStatus:'在世状态',deathDate:'逝世日期',commonName:'常用名',alias:'别名',hometown:'籍贯',tombLocation:'陵墓位置',tombDescription:'陵墓说明',photo:'照片'})[key] || key}：${key === 'photo' ? (value ? '已上传' : '未上传') : value || '未记录'}`; preview.append(row); });
+        preview.open = true;
+        summary.textContent = `查看修改（${Object.keys(review.patch).length} 项）`;
+        Object.entries(review.patch).forEach(([key,value]) => {
+          const row = document.createElement('div'); row.className='review-change';
+          const label=document.createElement('strong');label.textContent=({name:'姓名',gender:'性别',birthYear:'出生',occupation:'职业',biography:'行传',lifeStatus:'在世状态',deathDate:'逝世日期',commonName:'常用名',alias:'别名',hometown:'籍贯',tombLocation:'陵墓位置',tombDescription:'陵墓说明',photo:'照片'})[key] || key;
+          const display=v=>key==='photo'?(v?'已上传照片':'未上传'):key==='lifeStatus'?({living:'在世',deceased:'已故',unknown:'待核实'}[v]||'待核实'):v||'未记录';
+          const old=document.createElement('p');old.className='review-before';old.textContent=`修改前：${display(review.before?.[key])}`;
+          const next=document.createElement('p');next.className='review-after';next.textContent=`修改后：${display(value)}`;
+          row.append(label,old,next);preview.append(row);
+          if(key==='photo'&&review.before?.photo) {const oldPhoto=features.avatar({name:'原照片',photo:review.before.photo});preview.append(oldPhoto);}
+        });
         if (review.patch.photo && features) preview.append(features.avatar({ name:review.title,photo:review.patch.photo }));
         item.firstElementChild.append(preview);
       }
