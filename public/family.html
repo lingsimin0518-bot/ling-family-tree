@@ -106,6 +106,12 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 #treeToolStatus { flex: 1 1 100%; min-height: 0; color: var(--muted); font-size: .76rem; }
 #treeToolStatus:empty { display: none; }
 .five-generation-selection { padding: .65rem .8rem; color: var(--red-dark); border-left: 3px solid var(--red); background: #fff4df; }
+.dialog-person-search { position: relative; display: grid; gap: .35rem; color: var(--muted); font-size: .86rem; }
+.dialog-person-search input { width: 100%; padding: .7rem .8rem; color: var(--ink); border: 1px solid #d8c7a8; border-radius: .5rem; background: white; }
+.dialog-search-results { position: absolute; top: calc(100% + .25rem); left: 0; right: 0; z-index: 70; max-height: 17rem; overflow: auto; padding: .3rem; border: 1px solid #d5c09c; border-radius: .55rem; background: #fffdf8; box-shadow: var(--shadow); }
+.dialog-person-result { display: grid; width: 100%; gap: .15rem; padding: .65rem; color: var(--ink); text-align: left; border: 0; border-bottom: 1px solid #eee2cf; background: transparent; cursor: pointer; }
+.dialog-person-result:hover, .dialog-person-result:focus { background: #fff2d8; outline: none; }
+.dialog-person-result small { color: var(--muted); }
 .five-generation-modes { display: grid; gap: .55rem; margin: 1rem 0; padding: 1rem; border: 1px solid #dfcda9; border-radius: .7rem; }
 .five-generation-modes label { display: flex; align-items: flex-start; gap: .65rem; padding: .65rem; border-radius: .5rem; cursor: pointer; }
 .five-generation-modes label:has(input:checked) { background: #fff0d2; }
@@ -121,6 +127,9 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 .five-generation-level h3 { margin: 0 0 .75rem; color: var(--red); font-size: 1rem; }
 .five-generation-empty { margin: 0; padding: 1rem; color: var(--muted); border: 1px dashed #d8c7a8; border-radius: .55rem; }
 .kinship-selection { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin: 1rem 0; }
+.kinship-pickers { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+.kinship-pickers > section { position: relative; padding: .75rem; border: 1px solid #eadbc2; border-radius: .6rem; background: #fffaf0; }
+.text-action { margin-top: .45rem; padding: .2rem 0; color: var(--red); border: 0; background: transparent; cursor: pointer; font-size: .78rem; }
 .kinship-selection p { margin: 0; padding: .65rem; border: 1px solid #eadbc2; border-radius: .45rem; background: #fffaf0; }
 .kinship-result section { margin: .8rem 0; padding: .8rem; border: 1px solid #dfcda9; border-radius: .6rem; }
 .kinship-result h3 { margin: 0 0 .65rem; color: var(--red); }
@@ -129,8 +138,13 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 .kinship-result dt { color: var(--muted); }
 .kinship-result dd { margin: 0; font-weight: 700; }
 .kinship-failure { padding: 1rem; color: var(--red); background: #fff0eb; }
+.five-generation-export-dialog #fiveGenerationExportSummary dl { display: grid; gap: .5rem; }
+.five-generation-export-dialog #fiveGenerationExportSummary dl div { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem; }
+.five-generation-export-dialog dt { color: var(--muted); }
+.five-generation-export-dialog dd { margin: 0; font-weight: 700; }
+.export-warning { padding: .8rem; color: #7a341f; border-left: 4px solid #c46a2b; background: #fff0df; line-height: 1.55; }
 #kinshipDictionaryFields { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; max-height: 55vh; overflow: auto; padding: .25rem; }
-@media (max-width: 640px) { .search-result-item { grid-template-columns: 1fr; } .search-result-actions { grid-template-columns: repeat(2, 1fr); } .tree-tools > button, .tree-tools > label { flex: 1 1 calc(50% - .45rem); } .tree-tools select, .tree-tools button { width: 100%; } .kinship-selection, #kinshipDictionaryFields { grid-template-columns: 1fr; } .kinship-result dl div { grid-template-columns: 1fr; gap: .1rem; } }
+@media (max-width: 640px) { .search-result-item { grid-template-columns: 1fr; } .search-result-actions { grid-template-columns: repeat(2, 1fr); } .tree-tools > button, .tree-tools > label { flex: 1 1 calc(50% - .45rem); } .tree-tools select, .tree-tools button { width: 100%; } .kinship-selection, .kinship-pickers, #kinshipDictionaryFields { grid-template-columns: 1fr; } .kinship-result dl div, .five-generation-export-dialog #fiveGenerationExportSummary dl div { grid-template-columns: 1fr; gap: .1rem; } }
 
 .tree-panel { overflow-x: auto; padding: 1rem 0 2rem; }
 .tree-panel { position: relative; min-height: 28rem; max-height: 76vh; overflow: auto; overscroll-behavior: contain; }
@@ -468,6 +482,7 @@ dd { margin: 0; }
       <button id="openFiveGenerationQuery" type="button">五代谱</button>
       <button id="exportTreeButton" type="button">导出PDF</button>
       <button id="returnFullTree" type="button" class="secondary-action" hidden>返回完整族谱</button>
+      <button id="exportFiveGenerationPdf" type="button" class="secondary-action" hidden>导出当前五代谱 PDF</button>
       <span id="treeToolStatus" role="status" aria-live="polite"></span>
       <span id="fiveGenerationStatus" hidden></span>
     </section>
@@ -512,7 +527,8 @@ dd { margin: 0; }
   <dialog id="fiveGenerationDialog" class="form-dialog five-generation-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
     <h2>五代查询</h2>
-    <p class="dialog-intro">中心人物统一从页面顶部“搜索成员”选择。无论哪种模式，结果固定为五代并包含本人。</p>
+    <p class="dialog-intro">在弹窗内搜索并选择中心人物。无论哪种模式，结果固定为五代并包含本人。</p>
+    <label class="dialog-person-search">搜索中心人物<input id="fiveGenerationSearch" type="search" autocomplete="off" placeholder="姓名、拼音首字母或第几代"><div id="fiveGenerationResults" class="dialog-search-results" hidden></div></label>
     <p id="fiveGenerationSelection" class="five-generation-selection">尚未选择中心人物</p>
     <fieldset class="five-generation-modes">
       <legend>查询方式</legend>
@@ -520,15 +536,26 @@ dd { margin: 0; }
       <label><input type="radio" name="fiveGenerationMode" value="DESCENDANTS_5"><span><strong>向下五代</strong><small>本人＋向下4代后代</small></span></label>
       <label><input type="radio" name="fiveGenerationMode" value="CENTERED_5"><span><strong>居中五代</strong><small>上2代＋本人＋下2代</small></span></label>
     </fieldset>
-    <div class="dialog-actions"><button id="chooseFiveGenerationPerson" type="button" class="secondary-action">从顶部搜索选择</button><button id="runFiveGenerationQuery" type="button" disabled>生成五代族谱</button></div>
+    <div class="dialog-actions"><button id="clearFiveGenerationPerson" type="button" class="secondary-action">清除选择</button><button id="runFiveGenerationQuery" type="button" disabled>生成五代族谱</button></div>
   </dialog>
   <dialog id="kinshipDialog" class="form-dialog kinship-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
     <h2>关系与称谓</h2>
-    <p class="dialog-intro">依次从页面顶部“搜索成员”选择人物 A 和人物 B，系统会根据当前家谱关系计算。</p>
+    <p class="dialog-intro">分别搜索并选择两个人物，系统会根据当前家谱关系计算称谓。</p>
+    <div class="kinship-pickers">
+      <section><label class="dialog-person-search">人物 A<input id="kinshipSearchA" type="search" autocomplete="off" placeholder="姓名、拼音首字母或第几代"><div id="kinshipResultsA" class="dialog-search-results" hidden></div></label><button id="clearKinshipA" type="button" class="text-action">清除人物 A</button></section>
+      <section><label class="dialog-person-search">人物 B<input id="kinshipSearchB" type="search" autocomplete="off" placeholder="姓名、拼音首字母或第几代"><div id="kinshipResultsB" class="dialog-search-results" hidden></div></label><button id="clearKinshipB" type="button" class="text-action">清除人物 B</button></section>
+    </div>
     <div id="kinshipSelection" class="kinship-selection"></div>
     <div id="kinshipResult" class="kinship-result" role="status"></div>
-    <div class="dialog-actions"><button id="chooseKinshipPeople" type="button">选择人物 A</button><button id="resetKinshipQuery" type="button" class="secondary-action">重新选择</button></div>
+    <div class="dialog-actions"><button id="swapKinshipPeople" type="button" class="secondary-action">交换 A/B</button><button id="queryKinshipButton" type="button" disabled>查询关系</button></div>
+  </dialog>
+  <dialog id="fiveGenerationExportDialog" class="form-dialog five-generation-export-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <h2>导出当前五代谱 PDF</h2>
+    <div id="fiveGenerationExportSummary"></div>
+    <p id="fiveGenerationExportWarning" class="export-warning" hidden>单页缩放后文字可能过小。推荐使用 A4 多页清晰导出，也可以强制单页导出。</p>
+    <div class="dialog-actions"><button id="exportFiveMultiPage" type="button">A4 多页清晰导出</button><button id="exportFiveSinglePage" type="button" class="secondary-action">强制单页导出</button></div>
   </dialog>
   <dialog id="kinshipDictionaryDialog" class="form-dialog kinship-dictionary-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
@@ -1028,7 +1055,10 @@ window.installFamilyFeatures = function (api) {
     printWindow.addEventListener('load',()=>printWindow.print(),{once:true});
   }
   ['hierarchy','ebook'].forEach(kind=>{ const bar=el('div','','member-tools export-tools');bar.append(button('导出 PDF',()=>exportPdf(kind)),el('small','打印预览中选择“另存为 PDF”'));document.querySelector(`[data-view-panel="${kind}"]`).prepend(bar); });
-  document.querySelector('#exportTreeButton')?.addEventListener('click',()=>exportPdf('tree'));
+  document.querySelector('#exportTreeButton')?.addEventListener('click',()=>{
+    if (document.querySelector('#tree.five-generation-tree')) document.querySelector('#exportFiveGenerationPdf')?.click();
+    else exportPdf('tree');
+  });
   document.querySelectorAll('[data-open-book]').forEach(node=>node.addEventListener('click',()=>{selectedBook=node.dataset.openBook;}));
   document.querySelector('#ebookDialog .ebook-reader-toolbar').append(button('导出本卷 PDF',()=>exportPdf('ebook')));
   function render() {
@@ -1288,13 +1318,24 @@ window.installFamilyFeatures = function (api) {
   const bookPage = document.querySelector("#bookPage");
   const bookPageStatus = document.querySelector("#bookPageStatus");
   const fiveGenerationDialog = document.querySelector('#fiveGenerationDialog');
+  const fiveGenerationSearch = document.querySelector('#fiveGenerationSearch');
+  const fiveGenerationResults = document.querySelector('#fiveGenerationResults');
   const fiveGenerationSelection = document.querySelector('#fiveGenerationSelection');
   const fiveGenerationStatus = document.querySelector('#fiveGenerationStatus');
   const returnFullTreeButton = document.querySelector('#returnFullTree');
   const runFiveGenerationQueryButton = document.querySelector('#runFiveGenerationQuery');
+  const exportFiveGenerationPdfButton = document.querySelector('#exportFiveGenerationPdf');
   const kinshipDialog = document.querySelector('#kinshipDialog');
   const kinshipSelection = document.querySelector('#kinshipSelection');
   const kinshipResult = document.querySelector('#kinshipResult');
+  const kinshipSearchA = document.querySelector('#kinshipSearchA');
+  const kinshipSearchB = document.querySelector('#kinshipSearchB');
+  const kinshipResultsA = document.querySelector('#kinshipResultsA');
+  const kinshipResultsB = document.querySelector('#kinshipResultsB');
+  const queryKinshipButton = document.querySelector('#queryKinshipButton');
+  const fiveGenerationExportDialog = document.querySelector('#fiveGenerationExportDialog');
+  const fiveGenerationExportSummary = document.querySelector('#fiveGenerationExportSummary');
+  const fiveGenerationExportWarning = document.querySelector('#fiveGenerationExportWarning');
   const editKinshipDictionaryButton = document.querySelector('#editKinshipDictionaryButton');
   const kinshipDictionaryDialog = document.querySelector('#kinshipDictionaryDialog');
   let lastViewedPerson = null;
@@ -1317,7 +1358,6 @@ window.installFamilyFeatures = function (api) {
   let activeFiveGenerationQuery = null;
   let kinshipPersonA = null;
   let kinshipPersonB = null;
-  let pendingSearchAction = null;
   let features;
   function pinyinInitials(name) {
     return window.FamilyNameSearch.initials(name);
@@ -1544,13 +1584,39 @@ window.installFamilyFeatures = function (api) {
     return path ? { path, terms: window.KinshipDictionary.describe(path, data) } : null;
   }
 
-  function renderKinshipQuery() {
+  function findDialogPeople(value) {
+    const query = value.trim();
+    if (!query) return [];
+    const generation = query.match(/^第?\s*(\d+)\s*代?$/);
+    if (generation) return data.people.filter(person => person.generation === Number(generation[1]));
+    return window.FamilyNameSearch.find(data.people, query);
+  }
+
+  function renderDialogPersonResults(input, container, onSelect) {
+    const query = input.value.trim();
+    const found = findDialogPeople(query);
+    container.replaceChildren();
+    found.slice(0, 30).forEach(person => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'dialog-person-result';
+      const name = document.createElement('strong'); name.textContent = person.name;
+      const meta = document.createElement('small'); meta.textContent = `第${person.generation}代 · ${person.birthYear || '出生年份未记录'}`;
+      button.append(name, meta); button.addEventListener('click', () => { input.value = person.name; container.hidden = true; onSelect(person); });
+      container.append(button);
+    });
+    if (query && !found.length) { const empty = document.createElement('p'); empty.className = 'search-empty'; empty.textContent = '没有匹配人物'; container.append(empty); }
+    container.hidden = !query;
+  }
+
+  function renderKinshipSelection(resetResult = false) {
     kinshipSelection.innerHTML = `<p><strong>人物 A：</strong>${kinshipPersonA ? escapeHtml(kinshipPersonA.name) : '未选择'}</p><p><strong>人物 B：</strong>${kinshipPersonB ? escapeHtml(kinshipPersonB.name) : '未选择'}</p>`;
+    queryKinshipButton.disabled = !kinshipPersonA || !kinshipPersonB;
     if (!kinshipPersonA || !kinshipPersonB) {
-      kinshipResult.innerHTML = '<p class="empty-state">请从顶部搜索结果中点击“查询关系”，依次选择两个人物。</p>';
-      document.querySelector('#chooseKinshipPeople').textContent = kinshipPersonA ? '选择人物 B' : '选择人物 A';
-      return;
-    }
+      kinshipResult.innerHTML = '<p class="empty-state">请分别搜索并选择人物 A 和人物 B。</p>';
+    } else if (resetResult) kinshipResult.innerHTML = '<p class="empty-state">人物已选择，请点击“查询关系”。</p>';
+  }
+
+  function runKinshipQuery() {
+    if (!kinshipPersonA || !kinshipPersonB) return;
     const forward = describeKinship(kinshipPersonA, kinshipPersonB);
     const reverse = describeKinship(kinshipPersonB, kinshipPersonA);
     if (!forward || !reverse) {
@@ -1567,33 +1633,19 @@ window.installFamilyFeatures = function (api) {
       <section><h3>反向称谓</h3><p>${escapeHtml(kinshipPersonB.name)}称呼${escapeHtml(kinshipPersonA.name)}：<strong>${escapeHtml(reverse.terms.primary)}</strong> <small>（标准称谓：${escapeHtml(reverse.terms.standard)}）</small></p></section>`;
   }
 
-  function beginTopSearch(action, message) {
-    pendingSearchAction = action;
-    if (kinshipDialog.open) kinshipDialog.close();
-    if (fiveGenerationDialog.open) fiveGenerationDialog.close();
-    searchInput.value = '';
-    updateSearch('');
-    treeToolStatus.textContent = message;
-    searchInput.focus();
-  }
-
   function selectKinshipPerson(person) {
-    if (!kinshipPersonA || pendingSearchAction !== 'kinship-b') {
-      kinshipPersonA = person; kinshipPersonB = null;
-      beginTopSearch('kinship-b', `已选择人物 A：${person.name}。请继续搜索人物 B，并点击“查询关系”。`);
-      return;
-    }
-    kinshipPersonB = person;
-    pendingSearchAction = null;
-    renderKinshipQuery();
-    kinshipDialog.showModal();
-    treeToolStatus.textContent = `已计算 ${kinshipPersonA.name} 与 ${kinshipPersonB.name} 的关系。`;
+    kinshipPersonA = person; kinshipPersonB = null;
+    kinshipSearchA.value = person.name; kinshipSearchB.value = '';
+    renderKinshipSelection(true);
+    if (!kinshipDialog.open) kinshipDialog.showModal();
+    kinshipSearchB.focus();
   }
 
   function clearFiveGenerationMode() {
     activeFiveGenerationQuery = null;
     tree.classList.remove('five-generation-tree');
     returnFullTreeButton.hidden = true;
+    exportFiveGenerationPdfButton.hidden = true;
     fiveGenerationStatus.textContent = '';
   }
 
@@ -1651,6 +1703,7 @@ window.installFamilyFeatures = function (api) {
     });
     tree.appendChild(result);
     returnFullTreeButton.hidden = false;
+    exportFiveGenerationPdfButton.hidden = false;
     fiveGenerationStatus.textContent = `正在查看：${person.name} · ${activeFiveGenerationQuery.label}`;
     treeToolStatus.textContent = `正在查看：${person.name} · ${activeFiveGenerationQuery.label}`;
     stats.textContent = `${person.name} · ${activeFiveGenerationQuery.label} · 本人计入5代`;
@@ -1658,8 +1711,66 @@ window.installFamilyFeatures = function (api) {
 
   function selectFiveGenerationPerson(person) {
     selectedFiveGenerationPerson = person;
+    fiveGenerationSearch.value = person.name;
+    fiveGenerationResults.hidden = true;
     fiveGenerationSelection.textContent = `已选择：${person.name} · 第${person.generation}代 · ${features.parentText(person)}`;
     runFiveGenerationQueryButton.disabled = false;
+  }
+
+  function updateFiveGenerationSearch() {
+    selectedFiveGenerationPerson = null;
+    runFiveGenerationQueryButton.disabled = true;
+    fiveGenerationSelection.textContent = '尚未选择中心人物';
+    renderDialogPersonResults(fiveGenerationSearch, fiveGenerationResults, selectFiveGenerationPerson);
+  }
+
+  function fiveGenerationExportMetrics() {
+    const source = tree.querySelector('.five-generation-result');
+    if (!activeFiveGenerationQuery || !source) return null;
+    const treeWidth = Math.max(1, Math.ceil(source.scrollWidth));
+    const treeHeight = Math.max(1, Math.ceil(source.scrollHeight));
+    const pageWidth = 1060, pageHeight = 730, overlap = 40;
+    const singleScale = Math.min(1, pageWidth / treeWidth, pageHeight / treeHeight);
+    const columns = Math.max(1, Math.ceil(Math.max(1, treeWidth - overlap) / (pageWidth - overlap)));
+    const rows = Math.max(1, Math.ceil(Math.max(1, treeHeight - overlap) / (pageHeight - overlap)));
+    const peopleCount = new Set([...source.querySelectorAll('[data-person-id]')].map(node => node.dataset.personId)).size;
+    return { source, treeWidth, treeHeight, pageWidth, pageHeight, overlap, singleScale, columns, rows, pageCount: columns * rows, peopleCount };
+  }
+
+  function prepareFiveGenerationExport() {
+    const metrics = fiveGenerationExportMetrics();
+    if (!metrics) return;
+    fiveGenerationExportSummary.innerHTML = `<dl><div><dt>人物数量</dt><dd>${metrics.peopleCount} 人</dd></div><div><dt>树状图尺寸</dt><dd>${metrics.treeWidth} × ${metrics.treeHeight}px</dd></div><div><dt>单页缩放比例</dt><dd>${Math.round(metrics.singleScale * 100)}%</dd></div><div><dt>多页预计</dt><dd>${metrics.pageCount} 页（${metrics.columns} × ${metrics.rows}）</dd></div><div><dt>导出内容</dt><dd>仅当前五代谱，不含操作界面</dd></div></dl>`;
+    fiveGenerationExportWarning.hidden = metrics.singleScale >= .55;
+    fiveGenerationExportDialog.showModal();
+  }
+
+  function exportCurrentFiveGenerationPdf(mode) {
+    const metrics = fiveGenerationExportMetrics();
+    if (!metrics) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { alert('请允许打开打印窗口后重试。'); return; }
+    const sourceHtml = metrics.source.outerHTML;
+    const styleText = document.querySelector('style')?.textContent || '';
+    const pages = [];
+    if (mode === 'single') {
+      const scaledWidth = metrics.treeWidth * metrics.singleScale;
+      const scaledHeight = metrics.treeHeight * metrics.singleScale;
+      const left = Math.max(0, (metrics.pageWidth - scaledWidth) / 2);
+      const top = Math.max(0, (metrics.pageHeight - scaledHeight) / 2);
+      pages.push(`<section class="five-pdf-page"><div class="five-pdf-source" style="width:${metrics.treeWidth}px;transform:translate(${left}px,${top}px) scale(${metrics.singleScale})">${sourceHtml}</div></section>`);
+    } else {
+      for (let row = 0; row < metrics.rows; row += 1) for (let column = 0; column < metrics.columns; column += 1) {
+        const x = column * (metrics.pageWidth - metrics.overlap);
+        const y = row * (metrics.pageHeight - metrics.overlap);
+        pages.push(`<section class="five-pdf-page"><div class="five-pdf-source" style="width:${metrics.treeWidth}px;transform:translate(${-x}px,${-y}px)">${sourceHtml}</div><span class="five-pdf-page-number">${pages.length + 1} / ${metrics.pageCount}</span></section>`);
+      }
+    }
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>当前五代谱</title><style>${styleText}\nhtml,body{margin:0!important;padding:0!important;background:white!important}.five-pdf-page{position:relative;width:1060px;height:730px;overflow:hidden;break-after:page;background:white}.five-pdf-source{position:absolute;left:0;top:0;transform-origin:top left}.five-pdf-source .five-generation-result{margin:0!important;box-shadow:none!important}.five-pdf-page-number{position:absolute;right:10px;bottom:6px;color:#777;font:12px sans-serif}@page{size:A4 landscape;margin:8mm}@media print{.five-pdf-page{width:281mm;height:194mm}.five-pdf-page:last-child{break-after:auto}}</style></head><body>${pages.join('')}</body></html>`);
+    printWindow.document.close();
+    fiveGenerationExportDialog.close();
+    printWindow.addEventListener('load', () => window.setTimeout(() => printWindow.print(), 250), { once: true });
   }
 
   function sizeQuickView() {
@@ -2066,16 +2177,33 @@ window.installFamilyFeatures = function (api) {
     treePanel.scrollTop = 0;
   });
   canvasLockButton.addEventListener("click", () => setCanvasLocked(!canvasLocked));
-  document.querySelector('#openKinshipQuery').addEventListener('click', () => { renderKinshipQuery(); kinshipDialog.showModal(); });
-  document.querySelector('#chooseKinshipPeople').addEventListener('click', () => beginTopSearch(kinshipPersonA ? 'kinship-b' : 'kinship-a', kinshipPersonA ? `人物 A：${kinshipPersonA.name}。请搜索人物 B。` : '请搜索人物 A，并在结果中点击“查询关系”。'));
-  document.querySelector('#resetKinshipQuery').addEventListener('click', () => { kinshipPersonA = null; kinshipPersonB = null; pendingSearchAction = null; renderKinshipQuery(); });
+  document.querySelector('#openKinshipQuery').addEventListener('click', () => { renderKinshipSelection(); kinshipDialog.showModal(); });
+  kinshipSearchA.addEventListener('input', () => renderDialogPersonResults(kinshipSearchA, kinshipResultsA, person => { kinshipPersonA = person; renderKinshipSelection(true); }));
+  kinshipSearchB.addEventListener('input', () => renderDialogPersonResults(kinshipSearchB, kinshipResultsB, person => { kinshipPersonB = person; renderKinshipSelection(true); }));
+  document.querySelector('#clearKinshipA').addEventListener('click', () => { kinshipPersonA = null; kinshipSearchA.value = ''; kinshipResultsA.hidden = true; renderKinshipSelection(true); kinshipSearchA.focus(); });
+  document.querySelector('#clearKinshipB').addEventListener('click', () => { kinshipPersonB = null; kinshipSearchB.value = ''; kinshipResultsB.hidden = true; renderKinshipSelection(true); kinshipSearchB.focus(); });
+  document.querySelector('#swapKinshipPeople').addEventListener('click', () => { [kinshipPersonA, kinshipPersonB] = [kinshipPersonB, kinshipPersonA]; kinshipSearchA.value = kinshipPersonA?.name || ''; kinshipSearchB.value = kinshipPersonB?.name || ''; renderKinshipSelection(true); });
+  queryKinshipButton.addEventListener('click', runKinshipQuery);
   document.querySelector('#openFiveGenerationQuery').addEventListener('click', () => {
     selectedFiveGenerationPerson = null;
+    fiveGenerationSearch.value = '';
+    fiveGenerationResults.replaceChildren();
+    fiveGenerationResults.hidden = true;
     fiveGenerationSelection.textContent = '尚未选择中心人物';
     runFiveGenerationQueryButton.disabled = true;
     fiveGenerationDialog.showModal();
+    fiveGenerationSearch.focus();
   });
-  document.querySelector('#chooseFiveGenerationPerson').addEventListener('click', () => beginTopSearch('five', '请搜索中心人物，并在结果中点击“查看五代谱”。'));
+  fiveGenerationSearch.addEventListener('input', updateFiveGenerationSearch);
+  [
+    [kinshipSearchA, kinshipResultsA],
+    [kinshipSearchB, kinshipResultsB],
+    [fiveGenerationSearch, fiveGenerationResults]
+  ].forEach(([input, results]) => input.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault(); results.querySelector('.dialog-person-result')?.focus();
+  }));
+  document.querySelector('#clearFiveGenerationPerson').addEventListener('click', () => { fiveGenerationSearch.value = ''; updateFiveGenerationSearch(); fiveGenerationSearch.focus(); });
   runFiveGenerationQueryButton.addEventListener('click', () => {
     if (!selectedFiveGenerationPerson) return;
     const mode = fiveGenerationDialog.querySelector('[name="fiveGenerationMode"]:checked').value;
@@ -2089,6 +2217,9 @@ window.installFamilyFeatures = function (api) {
     renderTree();
     treeToolStatus.textContent = '已返回完整族谱。';
   });
+  exportFiveGenerationPdfButton.addEventListener('click', prepareFiveGenerationExport);
+  document.querySelector('#exportFiveMultiPage').addEventListener('click', () => exportCurrentFiveGenerationPdf('multi'));
+  document.querySelector('#exportFiveSinglePage').addEventListener('click', () => exportCurrentFiveGenerationPdf('single'));
   document.querySelector('#showFullTreeButton').addEventListener('click', () => {
     generationSelect.value = '';
     document.querySelector('#showFullTreeButton').classList.add('active');
