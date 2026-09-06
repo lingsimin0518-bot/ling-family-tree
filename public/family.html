@@ -260,11 +260,17 @@ dd { margin: 0; }
 .review-change > strong,.review-after { color:#b62020;font-weight:600; }
 .review-before { color:#74695e; }
 .empty-state { padding: 2rem; color: var(--muted); text-align: center; border: 1px dashed #d8c7a8; border-radius: .65rem; }
-.generation-summary-view { min-width: 100%; display: grid; gap: 1.2rem; }
-.generation-group { padding: 1rem; border: 1px solid #d5c09c; border-radius: .8rem; background: rgba(255, 253, 248, .78); }
+.tree-panel.quick-view-panel { overflow-x: hidden; touch-action: pan-y; }
+.quick-view-panel .zoom-toolbar { display: none; }
+.generation-summary-view { min-width: 0; display: grid; gap: 1.2rem; }
+.generation-group { min-width: 0; container-type: inline-size; padding: 1rem; border: 1px solid #d5c09c; border-radius: .8rem; background: rgba(255, 253, 248, .78); }
 .generation-group h2 { margin: 0 0 .8rem; color: var(--red); font-size: 1rem; }
-.generation-card-row { display: flex; align-items: stretch; gap: 1rem; overflow-x: auto; padding-bottom: .5rem; }
-.generation-card-row .v3-couple { flex: 0 0 330px; }
+.generation-card-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 1rem; padding-bottom: .5rem; }
+.generation-card-row .v3-couple { flex: 0 0 auto; width: max-content; }
+@container (max-width: 337px) {
+  .generation-card-row .v3-couple { flex-basis: 142px; grid-template-columns: 142px; }
+  .generation-card-row .marriage-link.horizontal { width: 142px; min-height: 2rem; }
+}
 .newly-added-focus { outline: 5px solid #27a76f !important; box-shadow: 0 0 0 9px rgba(39, 167, 111, .24), var(--shadow) !important; animation: focus-pulse .8s ease-in-out 3; }
 @keyframes focus-pulse { 50% { transform: scale(1.06); } }
 .branch-boundary-marker { display: none; width: 280px; margin-top: .65rem; padding: .45rem .6rem; color: #6f5427; text-align: center; font-size: .68rem; border: 1px dashed #9b7636; border-radius: .4rem; background: #fff4ce; }
@@ -1057,6 +1063,9 @@ window.installFamilyFeatures = function (api) {
   }
 
   function renderTree() {
+    treePanel.classList.remove("quick-view-panel");
+    tree.classList.remove("generation-summary-view");
+    tree.style.removeProperty("width");
     tree.replaceChildren();
     tree.classList.add("normalized-tree");
     const childIds = new Set(data.unions.flatMap((union) => union.childrenIds));
@@ -1197,6 +1206,7 @@ window.installFamilyFeatures = function (api) {
     tree.replaceChildren();
     tree.classList.remove("normalized-tree");
     tree.classList.add("generation-summary-view");
+    enableQuickView();
     const section = document.createElement("section");
     section.className = "generation-group relationship-result";
     section.innerHTML = `<h2>${escapeHtml(base.name)} → 第${targetGeneration}代</h2>`;
@@ -1232,10 +1242,27 @@ window.installFamilyFeatures = function (api) {
     return person.gender === "男" ? "孙子" : "孙女";
   }
 
+  function sizeQuickView() {
+    if (!treePanel.classList.contains("quick-view-panel")) return;
+    // Preserve the current card scale while fitting complete couples to the viewport.
+    tree.style.width = `${treePanel.clientWidth / treeZoom}px`;
+    treePanel.scrollLeft = 0;
+  }
+
+  function enableQuickView() {
+    setCanvasLocked(false);
+    treePanel.classList.add("quick-view-panel");
+    tree.style.zoom = treeZoom;
+    treePanel.scrollTop = 0;
+    sizeQuickView();
+  }
+  new ResizeObserver(sizeQuickView).observe(treePanel);
+
   function renderGenerationView(generation) {
     tree.replaceChildren();
     tree.classList.remove("normalized-tree");
     tree.classList.add("generation-summary-view");
+    enableQuickView();
     const selected = data.people.filter((person) => (person.lineage === "ling" || person.fatherId || person.motherId) && person.generation === generation);
     const grouped = new Map();
     selected.forEach((person) => {
@@ -1290,6 +1317,7 @@ window.installFamilyFeatures = function (api) {
   }
 
   function setTreeZoom(nextZoom, pointerX) {
+    if (treePanel.classList.contains("quick-view-panel")) return;
     const previousZoom = treeZoom;
     treeZoom = Math.min(1.6, Math.max(.25, Math.round(nextZoom * 20) / 20));
     if (treeZoom === previousZoom) return;
@@ -1302,6 +1330,7 @@ window.installFamilyFeatures = function (api) {
   }
 
   treePanel.addEventListener("wheel", (event) => {
+    if (treePanel.classList.contains("quick-view-panel")) return;
     if (event.target.closest(".zoom-toolbar")) return;
     if (!canvasLocked && !event.ctrlKey) return;
     event.preventDefault();
@@ -1310,6 +1339,7 @@ window.installFamilyFeatures = function (api) {
   }, { passive: false });
 
   function setCanvasLocked(locked) {
+    if (locked && treePanel.classList.contains("quick-view-panel")) return;
     canvasLocked = locked;
     treePanel.classList.toggle("canvas-locked", locked);
     canvasLockButton.setAttribute("aria-pressed", String(locked));
@@ -1318,6 +1348,7 @@ window.installFamilyFeatures = function (api) {
   }
 
   treePanel.addEventListener("dblclick", (event) => {
+    if (treePanel.classList.contains("quick-view-panel")) return;
     if (event.target.closest("button, input, select, textarea, .zoom-toolbar")) return;
     setCanvasLocked(!canvasLocked);
   });
