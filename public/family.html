@@ -305,6 +305,26 @@ dd { margin: 0; }
 .view-switcher button { min-height: 2.8rem; color: var(--red-dark); border: 0; border-radius: .55rem; background: transparent; cursor: pointer; font-weight: 700; }
 .view-switcher button.active { color: white; background: var(--red); }
 .view-switcher { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.view-switcher { grid-template-columns: repeat(6,minmax(0,1fr)); }
+.announcement-ticker { display:flex;align-items:center;gap:16px;overflow:hidden; }
+.announcement-ticker > strong { flex-shrink:0; }
+.ticker-window { flex:1;min-width:0;overflow:hidden; }
+#latestAnnouncement { width:100%;text-align:left;border:0;background:transparent;color:#78420d;font:inherit;cursor:pointer;overflow:hidden; }
+#latestAnnouncementTitle { display:inline-block;white-space:nowrap;padding-left:100%;animation:announcement-scroll 24s linear infinite; }
+#pauseAnnouncement { flex-shrink:0;border:1px solid #cbaa72;background:transparent;padding:7px;border-radius:4px;color:#78420d;cursor:pointer; }
+.announcement-ticker:hover #latestAnnouncementTitle,.announcement-ticker:focus-within #latestAnnouncementTitle,.ticker-paused #latestAnnouncementTitle { animation-play-state:paused; }
+@keyframes announcement-scroll { from{transform:translateX(0)}to{transform:translateX(-100%)} }
+@media(prefers-reduced-motion:reduce){#latestAnnouncementTitle{animation:none;padding-left:0;white-space:normal}#pauseAnnouncement{display:none}}
+.community-panel { max-width:1100px;margin:0 auto;padding:24px;background:#fffdf8;border:1px solid #d5c09c;border-radius:8px; }
+.community-heading { display:flex;align-items:center;justify-content:space-between;gap:16px; }
+.community-card { padding:22px 0;border-top:1px solid #e4d6bf; }
+.community-card h3 { color:var(--red-dark);margin:8px 0; }
+.community-meta { color:var(--muted);font-size:14px; }
+.community-body { line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere; }
+.community-panel button,.community-dialog button { padding:10px 16px;border:1px solid #b98a45;border-radius:6px;background:#fff8e8;color:var(--red-dark);font:inherit;cursor:pointer; }
+.community-dialog { width:min(92vw,650px); }
+.community-feedback { padding:12px;background:#edf5ea;color:#315627; }
+@media(max-width:640px){.view-switcher{grid-template-columns:repeat(3,minmax(0,1fr))}.announcement-ticker{gap:8px;padding:12px!important}.community-panel{padding:16px}#pauseAnnouncement{font-size:12px}}
 .member-tools { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:16px 0; }
 .member-tools button,.member-tools select,.member-tools input,.members-panel button,#memberDetail button,.memorial-dialog button { padding:10px 14px; border:1px solid #cbaa72; border-radius:6px; background:#fffaf0; color:#64201f; cursor:pointer; font:inherit; }
 .member-tools input { flex:1; min-width:180px; }
@@ -365,8 +385,10 @@ dd { margin: 0; }
   </header>
 
   <main>
-    <section class="notice">
-      <strong>代际树原型：</strong>去除个人视角称呼；共同先祖为第一代，“玉”字辈为第二代，“永”字辈为第三代。新增人物与生平均为测试数据。
+    <section class="notice announcement-ticker" aria-label="最新家族公告">
+      <strong>最新公告</strong>
+      <div class="ticker-window"><button id="latestAnnouncement" type="button"><span id="latestAnnouncementTitle">暂无公告</span></button></div>
+      <button id="pauseAnnouncement" type="button" aria-pressed="false">暂停滚动</button>
     </section>
     <section class="toolbar" aria-label="族谱工具栏">
       <label class="global-search-box">
@@ -390,6 +412,8 @@ dd { margin: 0; }
       <button type="button" data-view="hierarchy">欧式表</button>
       <button type="button" data-view="members">族人列表</button>
       <button type="button" data-view="ebook">族谱电子书</button>
+      <button type="button" data-view="announcements">家族公告</button>
+      <button type="button" data-view="activity">家族动态</button>
     </nav>
     <section class="generation-explorer-panel view-panel" data-view-panel="hierarchy" aria-labelledby="generationExplorerTitle" hidden>
       <div class="generation-explorer-heading">
@@ -629,7 +653,53 @@ window.installFamilyFeatures = function (api) {
     api.bookCollections.stories = originalBooks.stories.concat(data.people.map(p => ({title:p.name,kicker:`第${p.generation}代 · ${p.synthetic ? '测试资料' : '待核实资料'}`,body:`${parentText(p)}\n配偶：${partnerOf(p)?.name || '未记录'}\n${p.biography}`})));
     tables=buildTables();renderTable();renderMembers();
   }
-  return {avatar,showPerson,parentText,extendEdit,readEdit,render};
+  const announcements = [{id:'welcome',title:'【示例公告】家谱资料征集：请核实姓名、亲属关系与人物照片',body:'欢迎族人参与修谱。请在人物详情中提交需要补充的内容，并注明资料来源，由管理员审核。\n这是一条演示公告，可在管理员模式下发布新的家族公告。',date:'2026-09-06',author:'管理员（演示）'}];
+  const activity = [{title:'八代族谱与人物资料整理',body:'族谱已提供八代世系、人物详情和电子书。现有随机测试信息仍需与正式资料区分。',date:'2026-09-06',author:'家谱整理记录'}];
+  const communityPanels = {};
+  const announcementDialog = el('dialog'); announcementDialog.className = 'community-dialog'; document.body.append(announcementDialog);
+  const composer = el('dialog'); composer.className = 'community-dialog'; document.body.append(composer);
+  ['announcements','activity'].forEach(kind => { const panel = el('section','','community-panel view-panel'); panel.dataset.viewPanel = kind; panel.hidden = true; document.querySelector('main').append(panel); communityPanels[kind] = panel; });
+  function showAnnouncement(item) {
+    if (!item) return;
+    announcementDialog.replaceChildren(button('关闭',()=>announcementDialog.close()),el('p',`${item.date} · ${item.author}`,'community-meta'),el('h2',item.title),el('p',item.body,'community-body'));
+    if (!announcementDialog.open) announcementDialog.showModal();
+  }
+  function compose(kind) {
+    if (!api.getRole()) { api.login(); return; }
+    if (kind === 'announcements' && api.getRole() !== 'admin') return;
+    composer.replaceChildren(button('关闭',()=>composer.close()),el('h2',kind === 'announcements' ? '发布家族公告' : '分享家族动态'));
+    const form = el('form','','member-form'); form.innerHTML = '<label>标题<input name="title" required maxlength="100"></label><label>正文<textarea name="body" required maxlength="3000" rows="7"></textarea></label><p>当前为演示版，发布内容仅保留在本次页面会话。</p><button type="submit">提交</button>';
+    form.addEventListener('submit', event => {
+      event.preventDefault(); if (!api.getRole() || (kind === 'announcements' && api.getRole() !== 'admin')) { composer.close(); return; }
+      const fields = new FormData(form); const title = fields.get('title').trim(), body = fields.get('body').trim(); if (!title || !body) return;
+      const item = {id:`post-${Date.now()}`,title,body,date:new Date().toLocaleString('zh-CN'),author:api.getRole() === 'admin' ? '管理员（演示）' : '族人（演示）'};
+      if (kind === 'announcements') announcements.unshift(item);
+      else if (api.getRole() === 'admin') activity.unshift(item);
+      else api.queueReview({type:'activity',category:'profile',title:`家族动态：${title}`,reason:body,payload:item});
+      composer.close();renderCommunity();
+      if (kind === 'activity' && api.getRole() !== 'admin') communityPanels.activity.prepend(el('p','动态已提交，审核通过后展示。','community-feedback'));
+    });
+    composer.append(form); composer.showModal();
+  }
+  function renderCommunity() {
+    document.querySelector('#latestAnnouncementTitle').textContent = announcements[0]?.title || '暂无公告';
+    document.querySelector('#latestAnnouncement').disabled = !announcements.length;
+    Object.entries(communityPanels).forEach(([kind,panel])=>{
+      panel.replaceChildren();const heading=el('div','','community-heading');heading.append(el('h2',kind === 'announcements' ? '家族公告' : '家族动态'));
+      if (kind === 'activity' || api.getRole() === 'admin') heading.append(button(kind === 'announcements' ? '发布公告' : '分享动态',()=>compose(kind)));
+      panel.append(heading);
+      if (kind === 'announcements' && api.getRole() !== 'admin') panel.append(el('p','公告由管理员发布。','community-meta'));
+      const posts = kind === 'announcements' ? announcements : activity;
+      if (!posts.length) panel.append(el('p','暂无内容。','empty-state'));
+      posts.forEach(item=>{const card=el('article','','community-card');card.append(el('p',`${item.date} · ${item.author}`,'community-meta'),el('h3',item.title),el('p',item.body,'community-body'));if(kind==='announcements')card.append(button('查看公告',()=>showAnnouncement(item)));panel.append(card);});
+    });
+  }
+  document.querySelector('#latestAnnouncement').addEventListener('click',()=>showAnnouncement(announcements[0]));
+  document.querySelector('#pauseAnnouncement').addEventListener('click',event=>{const node=event.currentTarget;const paused=node.getAttribute('aria-pressed')!=='true';node.setAttribute('aria-pressed',String(paused));node.textContent=paused?'继续滚动':'暂停滚动';document.querySelector('.announcement-ticker').classList.toggle('ticker-paused',paused);});
+  const approveActivity = review => {activity.unshift({...review.payload,date:new Date().toLocaleString('zh-CN')});renderCommunity();};
+  const recordActivity = review => { activity.unshift({title:review.title,body:'人物资料申请已通过管理员审核，族谱已更新。',date:new Date().toLocaleString('zh-CN'),author:'审核记录'});renderCommunity(); };
+  renderCommunity();
+  return {avatar,showPerson,parentText,extendEdit,readEdit,render,renderCommunity,approveActivity,recordActivity};
 };
 
 </script>
@@ -1030,6 +1100,7 @@ window.installFamilyFeatures = function (api) {
     reviewButton.hidden = role !== "admin";
     actionStatus.textContent = role === "admin" ? "管理员模式：可以审核注册和资料申请。" : "普通成员模式：可以提交资料，审核中心不可见。";
     loginDialog.close();
+    features?.renderCommunity();
   }
 
   const bookCollections = {
@@ -1345,7 +1416,9 @@ window.installFamilyFeatures = function (api) {
   function approveReview(review) {
     if (currentRole !== 'admin') return;
     let approvedPersonId = null;
-    if (review.type === "registration" || review.type === "profile") {
+    if (review.type === 'activity') {
+      features.approveActivity(review);
+    } else if (review.type === "registration" || review.type === "profile") {
       approvedPersonId = null;
     } else if (review.type === "edit") {
       const person = peopleById.get(review.personId);
@@ -1380,6 +1453,7 @@ window.installFamilyFeatures = function (api) {
       }
     }
     pendingReviews = pendingReviews.filter((item) => item.id !== review.id);
+    if (review.type === 'add' || review.type === 'edit') features.recordActivity(review);
     updateReviewBadge();
     renderTree();
     updateRelationshipBaseOptions();
