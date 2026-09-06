@@ -226,7 +226,6 @@ dd { margin: 0; }
 .generation-children > .family-node:first-child::after { left: 50%; }
 .generation-children > .family-node:last-child::after { right: 50%; }
 .generation-children > .family-node:only-child::after { display: none; }
-.generation-5 .generation-children { display: none; }
 
 .action-bar { max-width: 1100px; margin: 0 auto 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
 .action-bar button, .primary-action, .review-actions button { padding: .65rem .9rem; color: var(--red-dark); border: 1px solid #cbaa72; border-radius: .55rem; background: #fffaf0; cursor: pointer; }
@@ -295,6 +294,9 @@ dd { margin: 0; }
 .explorer-generation-3 .generation-explorer-content { margin-left: 3.5rem; }
 .explorer-generation-4 .generation-explorer-content { margin-left: 4.5rem; }
 .explorer-generation-5 .generation-explorer-content { margin-left: 5.5rem; }
+.explorer-generation-6 .generation-explorer-content { margin-left: 6.5rem; }
+.explorer-generation-7 .generation-explorer-content { margin-left: 7.5rem; }
+.explorer-generation-8 .generation-explorer-content { margin-left: 8.5rem; }
 .explorer-name-list { display: flex; flex-wrap: wrap; gap: .35rem; padding: .65rem; }
 .explorer-name-list button { padding: .35rem .55rem; color: var(--ink); border: 1px solid #e0d2b9; border-radius: .35rem; background: #fffaf0; cursor: pointer; }
 .explorer-name-list span, .generation-end { padding: .45rem .65rem; color: var(--muted); font-size: .75rem; }
@@ -368,12 +370,12 @@ dd { margin: 0; }
     </section>
     <nav class="view-switcher" aria-label="族谱浏览方式">
       <button type="button" class="active" data-view="tree">树状族谱</button>
-      <button type="button" data-view="hierarchy">五代导航</button>
+      <button type="button" data-view="hierarchy">八代导航</button>
       <button type="button" data-view="ebook">族谱电子书</button>
     </nav>
     <section class="generation-explorer-panel view-panel" data-view-panel="hierarchy" aria-labelledby="generationExplorerTitle" hidden>
       <div class="generation-explorer-heading">
-        <div><strong id="generationExplorerTitle">五代层级导航</strong><span>点击箭头逐代展开，直观看清上一代与下一代</span></div>
+        <div><strong id="generationExplorerTitle">八代层级导航</strong><span>点击箭头逐代展开，直观看清上一代与下一代</span></div>
         <button id="expandAllGenerations" type="button">全部展开</button>
       </div>
       <div id="generationExplorer" class="generation-explorer"></div>
@@ -387,6 +389,9 @@ dd { margin: 0; }
       <button type="button" data-generation="3">第三代</button>
       <button type="button" data-generation="4">第四代</button>
       <button type="button" data-generation="5">第五代</button>
+      <button type="button" data-generation="6">第六代</button>
+      <button type="button" data-generation="7">第七代</button>
+      <button type="button" data-generation="8">第八代</button>
       <button id="branchBoundaryButton" type="button" class="branch-rule-button" aria-pressed="false">显示五代分家边界</button>
     </section>
     <section class="relationship-bar" aria-label="跨代关系查询">
@@ -394,7 +399,7 @@ dd { margin: 0; }
       <label>搜索<input id="relationshipSearch" type="search" placeholder="姓名或首字母，如 LYH"></label>
       <label>基准成员<select id="relationshipBase"></select></label>
       <span>与</span>
-      <label>目标代<select id="relationshipTarget"><option value="2">第二代</option><option value="3">第三代</option><option value="4">第四代</option><option value="5">第五代</option></select></label>
+      <label>目标代<select id="relationshipTarget"><option value="2">第二代</option><option value="3">第三代</option><option value="4">第四代</option><option value="5">第五代</option><option value="6">第六代</option><option value="7">第七代</option><option value="8">第八代</option></select></label>
       <button id="showRelationshipButton" type="button">显示关系</button>
       <span id="relationshipStatus" role="status"></span>
     </section>
@@ -423,7 +428,7 @@ dd { margin: 0; }
       <div class="ebook-heading"><div><p class="eyebrow">电子族谱</p><h2 id="ebookTitle">凌氏家谱藏书</h2></div><span>共 2 卷 · 试阅版</span></div>
       <article class="ebook-card">
         <div class="book-cover traditional"><span>凌氏家谱</span><small>世系卷</small></div>
-        <div><h3>凌氏家谱 · 世系卷</h3><dl><div><dt>卷号</dt><dd>第一卷</dd></div><div><dt>内容</dt><dd>五代世系与家庭支脉</dd></div><div><dt>编修</dt><dd>凌氏家族理事会（演示）</dd></div></dl><button type="button" data-open-book="lineage">阅读谱书</button></div>
+        <div><h3>凌氏家谱 · 世系卷</h3><dl><div><dt>卷号</dt><dd>第一卷</dd></div><div><dt>内容</dt><dd>八代世系与家庭支脉</dd></div><div><dt>编修</dt><dd>凌氏家族理事会（演示）</dd></div></dl><button type="button" data-open-book="lineage">阅读谱书</button></div>
       </article>
       <article class="ebook-card">
         <div class="book-cover modern"><span>凌氏家谱</span><small>家训行传</small></div>
@@ -527,7 +532,7 @@ dd { margin: 0; }
     const occupation = occupations[index % occupations.length];
     return addPerson({
       name, gender, generation, lineage: "ling", synthetic,
-      birthYear: `${1900 + generation * 27 + (index % 13)}${synthetic ? "（测试）" : "（待考）"}`,
+      birthYear: generation > 5 ? "年份待考（测试）" : `${1900 + generation * 27 + (index % 13)}${synthetic ? "（测试）" : "（待考）"}`,
       occupation: `${occupation}${synthetic ? "（测试）" : "（待补充）"}`,
       biography: synthetic ? generatedBiography(name, occupation) : `${name}的详细生平仍待家族成员补充。`,
       fatherId: parents && parents.father ? parents.father.id : null,
@@ -544,8 +549,8 @@ dd { margin: 0; }
   function growBelow(parent, spouse, seed, maxGeneration) {
     if (parent.generation >= maxGeneration) return;
     const nextGeneration = parent.generation + 1;
-    // 第四代通常1人，少数2人；第五代为1-3人。
-    const childCount = nextGeneration === 4 ? 1 + (seed % 5 === 0 ? 1 : 0) : 1 + (seed % 3);
+    // 第四代通常1人，少数2人；第五代1-3人；第六至八代以1人为主，少数2人。
+    const childCount = nextGeneration === 4 ? 1 + (seed % 5 === 0 ? 1 : 0) : nextGeneration >= 6 ? 1 + (seed % 4 === 0 ? 1 : 0) : 1 + (seed % 3);
     const children = [];
     for (let i = 0; i < childCount; i += 1) {
       const index = seed * 3 + i;
@@ -595,7 +600,7 @@ dd { margin: 0; }
       gen3Children.filter((child) => child.lineage === "ling").forEach((child, childIndex) => {
         const spouseName = knownSpouses[child.name];
         const spouse = makeSpouse(3, branchIndex * 4 + childIndex, child.gender === "男" ? "女" : "男", spouseName);
-        growBelow(child, spouse, branchIndex * 5 + childIndex + 1, 5);
+        growBelow(child, spouse, branchIndex * 5 + childIndex + 1, 8);
       });
       gen2Children.push(member);
     });
@@ -616,7 +621,7 @@ dd { margin: 0; }
         const gen3Gender = (i + j) % 3 === 0 ? "女" : "男";
         const gen3 = makeLing(`凌永${laterNames[(rootIndex * 7 + i * 2 + j) % laterNames.length].slice(-1)}`, gen3Gender, 3, parentsOf(child, childSpouse), true, rootIndex * 30 + i * 3 + j);
         const gen3Spouse = makeSpouse(3, rootIndex * 30 + i * 3 + j, gen3Gender === "男" ? "女" : "男");
-        growBelow(gen3, gen3Spouse, rootIndex * 31 + i * 5 + j + 1, 5);
+        growBelow(gen3, gen3Spouse, rootIndex * 31 + i * 5 + j + 1, 8);
         gen3Children.push(gen3);
       }
       addUnion(child, childSpouse, gen3Children);
@@ -628,7 +633,7 @@ dd { margin: 0; }
   addKnownMainFamily();
   addSyntheticFirstGeneration("凌元德", "许兰芝", 1, 4);
   addSyntheticFirstGeneration("凌元庆", "韩秀云", 2, 5);
-  window.NORMALIZED_FAMILY_TREE = { people, unions, metadata: { maxGeneration: 5, firstGenerationFamilies: 3 } };
+  window.NORMALIZED_FAMILY_TREE = { people, unions, metadata: { maxGeneration: 8, firstGenerationFamilies: 3 } };
 })();
 
 </script>
@@ -822,7 +827,7 @@ dd { margin: 0; }
       section.appendChild(renderFamily(root.id));
       tree.appendChild(section);
     });
-    stats.textContent = `${data.people.length} 位人物 · 5 代 · ${roots.length} 个第一代家庭`;
+    stats.textContent = `${data.people.length} 位人物 · ${data.metadata.maxGeneration} 代 · ${roots.length} 个第一代家庭`;
     tree.style.zoom = treeZoom;
     tree.classList.toggle("show-branch-boundaries", showBranchBoundary);
     renderGenerationExplorer();
@@ -830,7 +835,7 @@ dd { margin: 0; }
 
   function renderGenerationExplorer() {
     generationExplorer.replaceChildren();
-    for (let generation = 1; generation <= 5; generation += 1) {
+    for (let generation = 1; generation <= data.metadata.maxGeneration; generation += 1) {
       const people = data.people.filter((person) => person.generation === generation && (person.lineage === "ling" || person.fatherId || person.motherId));
       const details = document.createElement("details");
       details.className = `generation-explorer-level explorer-generation-${generation}`;
@@ -851,7 +856,8 @@ dd { margin: 0; }
       });
       if (people.length > 18) names.insertAdjacentHTML("beforeend", `<span>另有 ${people.length - 18} 位…</span>`);
       content.appendChild(names);
-      if (generation === 5) content.insertAdjacentHTML("beforeend", '<div class="generation-end">五代同谱到此 · 第六代起可建立分支谱</div>');
+      if (generation === 5) content.insertAdjacentHTML("beforeend", '<div class="generation-end">五代同谱边界 · 第六代起属于延续支系</div>');
+      if (generation === data.metadata.maxGeneration) content.insertAdjacentHTML("beforeend", '<div class="generation-end">当前测试资料记录至第八代</div>');
       details.appendChild(content);
       generationExplorer.appendChild(details);
     }
@@ -871,7 +877,8 @@ dd { margin: 0; }
     lineage: [
       { title: "凌氏家谱 · 世系卷", kicker: "卷首", body: "木有本，水有源。族谱以共同先祖为第一代，逐代记录婚配、子女、迁居与生平。本卷资料处于家族内部整理阶段。" },
       { title: "第一代世系", kicker: "第一章", body: "第一代为各支共同起点。谱图中的夫妻横向并列，子女依出生次序标注长子、次子、长女、次女。" },
-      { title: "第二至第五代", kicker: "第二章", body: "各代沿父母家庭向下延伸。第一至第五代保持同谱，第六代起可根据家族实际情况建立分支谱。" }
+      { title: "第二至第五代", kicker: "第二章", body: "各代沿父母家庭向下延伸。第一至第五代保持同谱，第六代起可根据家族实际情况建立分支谱。" },
+      { title: "第六至第八代", kicker: "第三章", body: "新增三代目前均为功能演示资料，用于检查分支谱、跨代关系、长幼排行和电子谱书的展示效果，不能作为正式家族史料。" }
     ],
     stories: [
       { title: "凌氏家训", kicker: "卷首", body: "敬祖睦族，孝亲友爱；诚实守信，勤学立身；珍惜家族记忆，也尊重每位成员的隐私与意愿。" },
@@ -918,12 +925,15 @@ dd { margin: 0; }
     if (gap === 2) return `${prefix}${target.gender === "男" ? "孙子" : "孙女"}`;
     if (gap === 3) return `${prefix}${target.gender === "男" ? "曾孙" : "曾孙女"}`;
     if (gap === 4) return `${prefix}${target.gender === "男" ? "玄孙" : "玄孙女"}`;
+    if (gap === 5) return `${prefix}${target.gender === "男" ? "来孙" : "来孙女"}`;
+    if (gap === 6) return `${prefix}${target.gender === "男" ? "晜孙" : "晜孙女"}`;
+    if (gap === 7) return `${prefix}${target.gender === "男" ? "仍孙" : "仍孙女"}`;
     return `相隔${gap}代后人`;
   }
 
   function updateRelationshipBaseOptions(query = "") {
     const currentValue = relationshipBase.value;
-    relationshipBase.innerHTML = [1, 2, 3, 4].map((generation) => {
+    relationshipBase.innerHTML = Array.from({ length: data.metadata.maxGeneration - 1 }, (_, index) => index + 1).map((generation) => {
       const options = data.people.filter((person) => person.lineage === "ling" && person.generation === generation && matchesPersonSearch(person, query)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")).map((person) => `<option value="${person.id}">[${pinyinInitials(person.name) || "#"}] ${escapeHtml(person.name)}</option>`).join("");
       return options ? `<optgroup label="第 ${generation} 代">${options}</optgroup>` : "";
     }).join("");
@@ -1135,7 +1145,7 @@ dd { margin: 0; }
   }
 
   function openAddDialog() {
-    const eligibleParents = data.people.filter((person) => person.lineage === "ling" && person.generation < 5);
+    const eligibleParents = data.people.filter((person) => person.lineage === "ling" && person.generation < data.metadata.maxGeneration);
     addDialogContent.innerHTML = `
       <h2>添加家族成员</h2>
       <form id="addForm" class="member-form">
@@ -1153,7 +1163,7 @@ dd { margin: 0; }
     const parentSelect = addDialogContent.querySelector("#parentSelect");
     const renderParentOptions = (query = "") => {
       const oldValue = parentSelect.value;
-      parentSelect.innerHTML = [1, 2, 3, 4].map((generation) => {
+      parentSelect.innerHTML = Array.from({ length: data.metadata.maxGeneration - 1 }, (_, index) => index + 1).map((generation) => {
         const options = eligibleParents.filter((person) => person.generation === generation && matchesPersonSearch(person, query)).sort((a, b) => a.name.localeCompare(b.name, "zh-CN")).map((person) => `<option value="${person.id}">[${pinyinInitials(person.name) || "#"}] ${escapeHtml(person.name)}</option>`).join("");
         return options ? `<optgroup label="第 ${generation} 代">${options}</optgroup>` : "";
       }).join("");
