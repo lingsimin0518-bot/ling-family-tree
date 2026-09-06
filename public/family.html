@@ -299,6 +299,35 @@ dd { margin: 0; }
 .explorer-name-list button { padding: .35rem .55rem; color: var(--ink); border: 1px solid #e0d2b9; border-radius: .35rem; background: #fffaf0; cursor: pointer; }
 .explorer-name-list span, .generation-end { padding: .45rem .65rem; color: var(--muted); font-size: .75rem; }
 @media (max-width: 640px) { .role-login-grid { grid-template-columns: 1fr; } .header-actions { flex-wrap: wrap; justify-content: flex-end; } }
+.view-switcher { position: sticky; top: 0; z-index: 25; display: grid; grid-template-columns: repeat(3, 1fr); max-width: 1100px; margin: 0 auto 1rem; padding: .35rem; border: 1px solid #d5c09c; border-radius: .75rem; background: rgba(255,253,248,.96); box-shadow: 0 8px 22px rgba(65,43,24,.08); }
+.view-switcher button { min-height: 2.8rem; color: var(--red-dark); border: 0; border-radius: .55rem; background: transparent; cursor: pointer; font-weight: 700; }
+.view-switcher button.active { color: white; background: var(--red); }
+[hidden] { display: none !important; }
+.ebook-library { max-width: 900px; margin: 0 auto 2rem; padding: 1.25rem; border: 1px solid #d5c09c; border-radius: .9rem; background: rgba(255,253,248,.9); }
+.ebook-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e5d6bc; }
+.ebook-heading h2 { margin: .15rem 0 0; color: var(--red-dark); }
+.ebook-heading > span { color: var(--muted); }
+.ebook-card { display: grid; grid-template-columns: 150px 1fr; gap: 1.25rem; padding: 1.25rem 0; border-bottom: 1px solid #e5d6bc; }
+.book-cover { display: grid; align-content: center; justify-items: center; min-height: 205px; padding: 1rem; color: #f8e9bb; border: 5px double #d8b45e; box-shadow: 5px 7px 0 #d8d0c2; background: #173a73; }
+.book-cover.modern { background: #7b2627; }
+.book-cover span { writing-mode: vertical-rl; padding: .6rem .35rem; color: #2c251e; background: #f9edbd; font-size: 1.35rem; letter-spacing: .2em; }
+.book-cover small { margin-top: .7rem; }
+.ebook-card h3 { margin: .1rem 0 .7rem; color: var(--red-dark); }
+.ebook-card dl { margin: 0 0 1rem; }
+.ebook-card dl div { display: grid; grid-template-columns: 4rem 1fr; padding: .22rem 0; }
+.ebook-card dt { color: var(--muted); }
+.ebook-card dd { margin: 0; }
+.ebook-card button { padding: .65rem 1.2rem; color: white; border: 0; border-radius: 999px; background: var(--red); cursor: pointer; }
+.ebook-dialog { width: min(92vw, 760px); padding: 0; overflow: hidden; }
+.ebook-reader-toolbar { display: flex; align-items: center; justify-content: space-between; padding: .8rem 3.8rem .8rem 1rem; color: white; background: var(--red-dark); }
+.ebook-reader-toolbar button { padding: .45rem .7rem; color: var(--red-dark); border: 0; border-radius: .35rem; background: #fff8e9; cursor: pointer; }
+.ebook-reader-toolbar button:disabled { opacity: .4; cursor: default; }
+.book-page { min-height: 480px; padding: clamp(2rem, 7vw, 5rem); background: repeating-linear-gradient(90deg, transparent 0 39px, rgba(142,47,44,.04) 40px), #fffaf0; }
+.book-page h2 { margin: .5rem 0 1rem; text-align: center; color: var(--red-dark); font-size: clamp(1.8rem, 5vw, 2.8rem); }
+.book-page > p:last-child { margin: 2rem auto 0; max-width: 32rem; font-size: 1.08rem; line-height: 2; text-indent: 2em; }
+.book-kicker { color: var(--gold); text-align: center; letter-spacing: .3em; }
+.book-rule { width: 7rem; margin: 0 auto; border-top: 2px solid var(--gold); }
+@media (max-width: 640px) { .view-switcher { top: 0; } .ebook-card { grid-template-columns: 105px 1fr; gap: .8rem; } .book-cover { min-height: 160px; } .ebook-card dl div { grid-template-columns: 3.5rem 1fr; } }
 
 </style>
 </head>
@@ -337,13 +366,19 @@ dd { margin: 0; }
       <button id="reviewButton" type="button" class="admin-button">管理员审核 <span id="reviewCount" class="count-badge">0</span></button>
       <p id="actionStatus" role="status" aria-live="polite"></p>
     </section>
-    <section class="generation-explorer-panel" aria-labelledby="generationExplorerTitle">
+    <nav class="view-switcher" aria-label="族谱浏览方式">
+      <button type="button" class="active" data-view="tree">树状族谱</button>
+      <button type="button" data-view="hierarchy">五代导航</button>
+      <button type="button" data-view="ebook">族谱电子书</button>
+    </nav>
+    <section class="generation-explorer-panel view-panel" data-view-panel="hierarchy" aria-labelledby="generationExplorerTitle" hidden>
       <div class="generation-explorer-heading">
         <div><strong id="generationExplorerTitle">五代层级导航</strong><span>点击箭头逐代展开，直观看清上一代与下一代</span></div>
         <button id="expandAllGenerations" type="button">全部展开</button>
       </div>
       <div id="generationExplorer" class="generation-explorer"></div>
     </section>
+    <div class="view-panel" data-view-panel="tree">
     <section class="generation-filter" aria-label="按代查看">
       <strong>快捷查看</strong>
       <button type="button" class="active" data-generation="all">全部族谱</button>
@@ -383,6 +418,18 @@ dd { margin: 0; }
       <span><i class="dot synthetic"></i>随机测试信息</span>
       <span><i class="line pending"></i>关系待确认</span>
     </section>
+    </div>
+    <section class="ebook-library view-panel" data-view-panel="ebook" hidden aria-labelledby="ebookTitle">
+      <div class="ebook-heading"><div><p class="eyebrow">电子族谱</p><h2 id="ebookTitle">凌氏家谱藏书</h2></div><span>共 2 卷 · 试阅版</span></div>
+      <article class="ebook-card">
+        <div class="book-cover traditional"><span>凌氏家谱</span><small>世系卷</small></div>
+        <div><h3>凌氏家谱 · 世系卷</h3><dl><div><dt>卷号</dt><dd>第一卷</dd></div><div><dt>内容</dt><dd>五代世系与家庭支脉</dd></div><div><dt>编修</dt><dd>凌氏家族理事会（演示）</dd></div></dl><button type="button" data-open-book="lineage">阅读谱书</button></div>
+      </article>
+      <article class="ebook-card">
+        <div class="book-cover modern"><span>凌氏家谱</span><small>家训行传</small></div>
+        <div><h3>凌氏家谱 · 家训行传</h3><dl><div><dt>卷号</dt><dd>第二卷</dd></div><div><dt>内容</dt><dd>家训、字辈与人物行传</dd></div><div><dt>编修</dt><dd>凌氏家族理事会（演示）</dd></div></dl><button type="button" data-open-book="stories">阅读谱书</button></div>
+      </article>
+    </section>
   </main>
 
   <dialog id="memberDialog">
@@ -397,6 +444,11 @@ dd { margin: 0; }
       <button type="button" data-login-role="member"><strong>普通成员</strong><span>查看族谱、提交新增或修改申请</span></button>
       <button type="button" data-login-role="admin"><strong>管理员</strong><span>拥有普通成员权限，并进入审核中心</span></button>
     </div>
+  </dialog>
+  <dialog id="ebookDialog" class="ebook-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <div class="ebook-reader-toolbar"><button id="previousBookPage" type="button">上一页</button><span id="bookPageStatus"></span><button id="nextBookPage" type="button">下一页</button></div>
+    <article id="bookPage" class="book-page"></article>
   </dialog>
   <dialog id="privacyDialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
@@ -622,6 +674,9 @@ dd { margin: 0; }
   const actionBar = document.querySelector("#actionBar");
   const reviewButton = document.querySelector("#reviewButton");
   const generationExplorer = document.querySelector("#generationExplorer");
+  const ebookDialog = document.querySelector("#ebookDialog");
+  const bookPage = document.querySelector("#bookPage");
+  const bookPageStatus = document.querySelector("#bookPageStatus");
   let lastViewedPerson = null;
   let currentRole = null;
   let reviewFilter = "all";
@@ -637,6 +692,8 @@ dd { margin: 0; }
   let dragButton = null;
   let currentSearchMatches = [];
   let showBranchBoundary = false;
+  let currentBookPages = [];
+  let currentBookPage = 0;
   const pinyinInitialMap = {
     凌:"L", 玉:"Y", 禾:"H", 平:"P", 书:"S", 明:"M", 忠:"Z", 伟:"W", 鹏:"P", 飞:"F", 亚:"Y", 茹:"R",
     永:"Y", 星:"X", 淑:"S", 瑾:"J", 辉:"H", 祥:"X", 宝:"B", 雨:"Y", 晨:"C", 珩:"H", 浩:"H", 琦:"Q", 珑:"L", 舒:"S", 琪:"Q",
@@ -716,19 +773,30 @@ dd { margin: 0; }
     return unit;
   }
 
-  function renderFamily(personId) {
+  function siblingRankLabel(person, siblings) {
+    const sameGender = siblings
+      .filter((item) => item.gender === person.gender)
+      .sort((a, b) => Number.parseInt(a.birthYear, 10) - Number.parseInt(b.birthYear, 10) || a.name.localeCompare(b.name, "zh-CN"));
+    const index = sameGender.findIndex((item) => item.id === person.id);
+    const numerals = ["长", "次", "三", "四", "五", "六", "七", "八", "九"];
+    return `${numerals[index] || `第${index + 1}`}${person.gender === "男" ? "子" : "女"}`;
+  }
+
+  function renderFamily(personId, siblingLabel = "") {
     const person = peopleById.get(personId);
     const union = unionByPersonId.get(personId);
     const family = document.createElement("div");
     family.className = `family-node generation-${person.generation}`;
-    family.appendChild(coupleElement(person, partnerOf(person)));
+    family.appendChild(coupleElement(person, partnerOf(person), siblingLabel));
     if (union && union.childrenIds.length) {
       const children = document.createElement("div");
       children.className = "generation-children";
-      union.childrenIds
+      const siblings = union.childrenIds
         .map((id) => peopleById.get(id))
-        .sort((a, b) => a.gender === b.gender ? a.name.localeCompare(b.name, "zh-CN") : a.gender === "男" ? -1 : 1)
-        .forEach((child) => children.appendChild(renderFamily(child.id)));
+        .filter(Boolean);
+      siblings
+        .sort((a, b) => a.gender === b.gender ? Number.parseInt(a.birthYear, 10) - Number.parseInt(b.birthYear, 10) || a.name.localeCompare(b.name, "zh-CN") : a.gender === "男" ? -1 : 1)
+        .forEach((child) => children.appendChild(renderFamily(child.id, siblingRankLabel(child, siblings))));
       family.appendChild(children);
     }
     if (person.generation === 5) {
@@ -797,6 +865,34 @@ dd { margin: 0; }
     reviewButton.hidden = role !== "admin";
     actionStatus.textContent = role === "admin" ? "管理员模式：可以审核注册和资料申请。" : "普通成员模式：可以提交资料，审核中心不可见。";
     loginDialog.close();
+  }
+
+  const bookCollections = {
+    lineage: [
+      { title: "凌氏家谱 · 世系卷", kicker: "卷首", body: "木有本，水有源。族谱以共同先祖为第一代，逐代记录婚配、子女、迁居与生平。本卷资料处于家族内部整理阶段。" },
+      { title: "第一代世系", kicker: "第一章", body: "第一代为各支共同起点。谱图中的夫妻横向并列，子女依出生次序标注长子、次子、长女、次女。" },
+      { title: "第二至第五代", kicker: "第二章", body: "各代沿父母家庭向下延伸。第一至第五代保持同谱，第六代起可根据家族实际情况建立分支谱。" }
+    ],
+    stories: [
+      { title: "凌氏家训", kicker: "卷首", body: "敬祖睦族，孝亲友爱；诚实守信，勤学立身；珍惜家族记忆，也尊重每位成员的隐私与意愿。" },
+      { title: "字辈记录", kicker: "第一章", body: "现有资料中，第二代使用“玉”字辈，第三代使用“永”字辈。其他字辈仍待长辈核实后正式收入谱书。" },
+      { title: "人物行传", kicker: "第二章", body: "人物生平应注明资料来源，经本人或近亲确认，并由管理员审核后收入电子谱书。测试内容不得作为正式史料。" }
+    ]
+  };
+
+  function renderBookPage() {
+    const page = currentBookPages[currentBookPage];
+    bookPage.innerHTML = `<p class="book-kicker">${escapeHtml(page.kicker)}</p><h2>${escapeHtml(page.title)}</h2><div class="book-rule"></div><p>${escapeHtml(page.body)}</p>`;
+    bookPageStatus.textContent = `第 ${currentBookPage + 1} / ${currentBookPages.length} 页`;
+    document.querySelector("#previousBookPage").disabled = currentBookPage === 0;
+    document.querySelector("#nextBookPage").disabled = currentBookPage === currentBookPages.length - 1;
+  }
+
+  function openBook(bookId) {
+    currentBookPages = bookCollections[bookId];
+    currentBookPage = 0;
+    renderBookPage();
+    ebookDialog.showModal();
   }
 
   function childrenOf(personId) {
@@ -1184,6 +1280,13 @@ dd { margin: 0; }
   document.querySelector("#editMemberButton").addEventListener("click", openEditDialog);
   reviewButton.addEventListener("click", () => { if (currentRole !== "admin") return; renderReviews(); reviewDialog.showModal(); });
   loginButton.addEventListener("click", () => loginDialog.showModal());
+  document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => {
+    document.querySelectorAll("[data-view]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+    document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== button.dataset.view; });
+  }));
+  document.querySelectorAll("[data-open-book]").forEach((button) => button.addEventListener("click", () => openBook(button.dataset.openBook)));
+  document.querySelector("#previousBookPage").addEventListener("click", () => { if (currentBookPage > 0) { currentBookPage -= 1; renderBookPage(); } });
+  document.querySelector("#nextBookPage").addEventListener("click", () => { if (currentBookPage < currentBookPages.length - 1) { currentBookPage += 1; renderBookPage(); } });
   document.querySelectorAll("[data-login-role]").forEach((button) => button.addEventListener("click", () => applyRole(button.dataset.loginRole)));
   document.querySelectorAll("[data-review-filter]").forEach((button) => button.addEventListener("click", () => {
     reviewFilter = button.dataset.reviewFilter;
