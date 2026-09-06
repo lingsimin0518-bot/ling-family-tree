@@ -265,9 +265,12 @@ dd { margin: 0; }
 .generation-summary-view { min-width: 0; display: grid; gap: 1.2rem; }
 .generation-group { min-width: 0; container-type: inline-size; padding: 1rem; border: 1px solid #d5c09c; border-radius: .8rem; background: rgba(255, 253, 248, .78); }
 .generation-group h2 { margin: 0 0 .8rem; color: var(--red); font-size: 1rem; }
-.generation-card-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 1rem; padding-bottom: .5rem; }
+.generation-card-row { display: grid; grid-template-columns: repeat(auto-fit, calc(322px + .9rem)); max-width: calc(966px + 4.7rem); align-items: stretch; gap: 1rem; padding-bottom: .5rem; }
 .generation-card-row .v3-couple { flex: 0 0 auto; width: max-content; }
+.generation-card-row .v3-card strong { font-size: 20px; line-height: 1.4; }
+.generation-card-row .v3-card small, .generation-card-row .relation-label { font-size: 14px; line-height: 1.5; }
 @container (max-width: 337px) {
+  .generation-card-row { grid-template-columns: 142px; }
   .generation-card-row .v3-couple { flex-basis: 142px; grid-template-columns: 142px; }
   .generation-card-row .marriage-link.horizontal { width: 142px; min-height: 2rem; }
 }
@@ -1244,15 +1247,15 @@ window.installFamilyFeatures = function (api) {
 
   function sizeQuickView() {
     if (!treePanel.classList.contains("quick-view-panel")) return;
-    // Preserve the current card scale while fitting complete couples to the viewport.
-    tree.style.width = `${treePanel.clientWidth / treeZoom}px`;
+    // Quick view is always readable at 100%, independent of the full-tree zoom.
+    tree.style.width = `${treePanel.clientWidth}px`;
     treePanel.scrollLeft = 0;
   }
 
   function enableQuickView() {
     setCanvasLocked(false);
     treePanel.classList.add("quick-view-panel");
-    tree.style.zoom = treeZoom;
+    tree.style.zoom = 1;
     treePanel.scrollTop = 0;
     sizeQuickView();
   }
@@ -1290,7 +1293,7 @@ window.installFamilyFeatures = function (api) {
       tree.appendChild(section);
     });
     stats.textContent = `第${generation}代：${selected.length} 位成员及其配偶`;
-    tree.style.zoom = treeZoom;
+    tree.style.zoom = 1;
   }
 
   function focusPerson(personId) {
