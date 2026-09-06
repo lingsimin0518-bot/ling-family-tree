@@ -67,6 +67,18 @@ export async function joinFamily(userId: string, code: string) {
   return family;
 }
 
+export async function deleteFamily(userId: string, familyId: string, confirmedName: string) {
+  if (familyId === LEGACY_FAMILY_ID) throw new Response('原有凌氏家谱属于系统保留族谱，不能删除', { status: 400 });
+  const role = await membership(userId, familyId);
+  if (role !== 'OWNER') throw new Response('只有族谱创建者可以删除整本族谱', { status: 403 });
+  const family = await db().prepare('SELECT id,name FROM families WHERE id=?').bind(familyId).first<{ id:string; name:string }>();
+  if (!family) throw new Response('族谱不存在', { status: 404 });
+  if (confirmedName !== family.name) throw new Response('输入的族谱名称不一致，已取消删除', { status: 400 });
+  const result = await db().prepare("DELETE FROM families WHERE id=? AND name=? AND source_type='DATABASE'").bind(familyId, confirmedName).run();
+  if (result.meta.changes !== 1) throw new Response('族谱未被删除', { status: 409 });
+  return { id: familyId, deleted: true };
+}
+
 export async function getFamilyTree(userId: string, familyId: string) {
   const role = await membership(userId, familyId);
   const binding = db();

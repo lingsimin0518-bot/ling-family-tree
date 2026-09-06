@@ -1,4 +1,4 @@
-import { addPerson, claimPerson, createFamily, ensureUser, getFamilyTree, joinFamily, listFamilies, reviewClaim, setMemberRole } from '../../../lib/family-store';
+import { addPerson, claimPerson, createFamily, deleteFamily, ensureUser, getFamilyTree, joinFamily, listFamilies, reviewClaim, setMemberRole } from '../../../lib/family-store';
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       return json(await createFamily(user.id, name, String(body.description ?? '')), 201);
     }
     if (body.action === 'JOIN_FAMILY') return json(await joinFamily(user.id, String(body.code ?? '')));
+    if (body.action === 'DELETE_FAMILY') return json(await deleteFamily(user.id, String(body.familyId ?? ''), String(body.confirmedName ?? '')));
     if (body.action === 'ADD_PERSON') return json(await addPerson(user.id, body as never), 201);
     if (body.action === 'CLAIM_PERSON') return json(await claimPerson(user.id, String(body.familyId ?? ''), String(body.personId ?? '')), 201);
     if (body.action === 'SET_MEMBER_ROLE') return json(await setMemberRole(user.id, String(body.familyId ?? ''), String(body.targetUserId ?? ''), String(body.role ?? '') as never));

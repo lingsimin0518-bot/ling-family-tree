@@ -28,6 +28,8 @@ export default function FamilyPortal() {
   const [loading,setLoading] = useState(true);
   const [message,setMessage] = useState('');
   const [addTarget,setAddTarget] = useState<{direction:keyof typeof directions;reference?:Person}|null>(null);
+  const [deleteTarget,setDeleteTarget] = useState<Family|null>(null);
+  const [deleteName,setDeleteName] = useState('');
   const current = families.find((family) => family.id === currentId) ?? families[0];
 
   const loadFamilies = async () => {
@@ -65,6 +67,13 @@ export default function FamilyPortal() {
     try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'JOIN_FAMILY',code:form.get('code')})}); await loadFamilies(); setMessage('已加入族谱。'); event.currentTarget.reset(); }
     catch (error) { setMessage((error as Error).message); }
   };
+  const deleteSelectedFamily = async () => {
+    if (!deleteTarget || deleteName !== deleteTarget.name) return;
+    try {
+      await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'DELETE_FAMILY',familyId:deleteTarget.id,confirmedName:deleteName})});
+      setDeleteTarget(null); setDeleteName(''); setCurrentId('family-lingshi-existing'); await loadFamilies(); setMessage('族谱已永久删除。');
+    } catch (error) { setMessage((error as Error).message); }
+  };
   const addPerson = async (event:FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!current || !addTarget) return;
@@ -92,8 +101,9 @@ export default function FamilyPortal() {
     {current?.source_type === 'LEGACY_STATIC' && <iframe title="凌氏家谱" src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}
     {current?.source_type === 'DATABASE' && <DatabaseTree tree={tree} onAdd={setAddTarget} onClaim={claim} onManage={manage} />}
     {showFamilies && <div className="veil"><section className="family-dialog"><button className="close" onClick={() => setShowFamilies(false)}>×</button><h2>我的族谱</h2><p>一个账号可以加入多本族谱，切换后所有人物与资料互不混用。</p>
-      <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button></article>)}</div>
+      <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><div className="family-row-actions"><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button>{family.role==='OWNER'&&family.source_type!=='LEGACY_STATIC'&&<button className="danger-link" onClick={()=>{setDeleteTarget(family);setDeleteName('')}}>删除</button>}</div></article>)}</div>
       <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button>创建族谱</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>
+      {deleteTarget&&<section className="delete-confirm" role="alertdialog" aria-modal="true" aria-labelledby="delete-family-title"><h3 id="delete-family-title">永久删除“{deleteTarget.name}”？</h3><p>人物、关系、公告、媒体和成员权限都会一并删除，无法恢复。请输入完整族谱名称确认：</p><input value={deleteName} onChange={event=>setDeleteName(event.target.value)} placeholder={deleteTarget.name} autoFocus/><div><button className="cancel-delete" onClick={()=>{setDeleteTarget(null);setDeleteName('')}}>取消</button><button className="confirm-delete" disabled={deleteName!==deleteTarget.name} onClick={deleteSelectedFamily}>确认永久删除</button></div></section>}
     </section></div>}
     {addTarget && <div className="veil"><form className="person-dialog" onSubmit={addPerson}><button type="button" className="close" onClick={() => setAddTarget(null)}>×</button><h2>{directions[addTarget.direction]}</h2>{addTarget.reference && <p>以 <strong>{addTarget.reference.name}</strong> 为参照添加</p>}<label>姓名<input name="name" required autoFocus /></label><label>性别<input name="gender" placeholder="可自由填写" /></label><label>出生年份<input name="birthYear" inputMode="numeric" /></label><label>人物生平<textarea name="biography" rows={4}/></label><button className="submit">保存人物</button></form></div>}
   </main>;
