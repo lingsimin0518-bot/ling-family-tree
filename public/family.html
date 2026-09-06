@@ -34,7 +34,8 @@ body {
     var(--paper);
 }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 .app-header {
   display: flex;
@@ -87,38 +88,30 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 .stats { color: var(--muted); font-size: .9rem; }
 .search-status { min-height: 1.2rem; margin-top: .25rem; color: var(--red); font-size: .8rem; text-align: right; }
 .search-results { position: absolute; top: calc(100% + .35rem); left: 0; z-index: 50; width: min(92vw, 30rem); max-height: 26rem; overflow-y: auto; padding: .35rem; border: 1px solid #d5c09c; border-radius: .7rem; background: #fffdf8; box-shadow: var(--shadow); }
-.search-result-item { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem .75rem; color: var(--ink); text-align: left; border: 0; border-bottom: 1px solid #eee2cf; background: transparent; cursor: pointer; }
-.search-result-item:hover, .search-result-item:focus { background: #fff2d8; outline: none; }
+.search-result-item { display: grid; width: 100%; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: .65rem; padding: .7rem .75rem; color: var(--ink); text-align: left; border: 0; border-bottom: 1px solid #eee2cf; background: transparent; }
+.search-result-item:hover { background: #fff8ea; }
 .search-result-item span { display: grid; gap: .18rem; }
 .search-result-item small, .search-result-item em { color: var(--muted); font-size: .72rem; font-style: normal; }
 .search-empty { padding: 1.25rem; color: var(--muted); text-align: center; }
 .search-match-label { color: var(--red) !important; }
 .search-result-item.homophone-result { background: #fff2d8; }
 .search-result-item.homophone-result .search-match-label::before { content: '≈ '; }
-.person-tree-search { position: relative; }
-.person-tree-search input { padding: .6rem; width: min(65vw, 24rem); border: 1px solid #d8c7a8; border-radius: .45rem; }
-.relationship-bar .search-result-item { background: #fffdf8; color: var(--ink); border: 0; border-bottom: 1px solid #eee2cf; }
-.mini-tree-level { position: relative; padding: 1rem 0; }
-.mini-tree-level + .mini-tree-level { margin-top: 2rem; border-top: 2px solid var(--line); }
-.mini-tree-level + .mini-tree-level::before { content: ''; position: absolute; top: -2rem; left: 5rem; height: 2rem; border-left: 2px solid var(--line); }
-.mini-tree-level h3 { color: var(--red); font-size: 1rem; }
-.five-generation-entry { max-width: 1100px; margin: 0 auto 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; padding: .8rem 1rem; border: 1px solid #dfcda9; border-radius: .7rem; background: #fff9ec; }
-.five-generation-entry > div { display: grid; gap: .2rem; margin-right: auto; }
-.five-generation-entry strong { color: var(--red-dark); }
-.five-generation-entry span { color: var(--muted); font-size: .82rem; }
-.five-generation-entry button, .five-generation-dialog .dialog-actions button { padding: .6rem .85rem; color: white; border: 1px solid var(--red); border-radius: .5rem; background: var(--red); cursor: pointer; }
-.five-generation-entry .secondary-action { color: var(--red); background: white; }
-.five-generation-search { position: relative; margin-bottom: 1rem; }
-.five-generation-search label { display: grid; gap: .35rem; color: var(--muted); }
-.five-generation-search input { width: 100%; padding: .7rem .8rem; border: 1px solid #d8c7a8; border-radius: .5rem; }
-.five-generation-search .search-results { width: 100%; }
+.search-result-actions { display: grid; grid-template-columns: repeat(2, auto); gap: .3rem; }
+.search-result-actions button { padding: .35rem .45rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: .38rem; background: white; cursor: pointer; font-size: .72rem; }
+.search-result-actions button:hover, .search-result-actions button:focus { color: white; border-color: var(--red); background: var(--red); outline: none; }
+.tree-tools { max-width: 1100px; min-height: 3rem; margin: 0 auto .55rem; display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; padding: .45rem; border: 1px solid #dfcda9; border-radius: .7rem; background: rgba(255,253,248,.85); }
+.tree-tools button, .tree-tools select, .five-generation-dialog .dialog-actions button, .kinship-dialog .dialog-actions button { min-height: 2.15rem; padding: .42rem .7rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: .48rem; background: white; cursor: pointer; }
+.tree-tools button.active, .tree-tools button:hover, .tree-tools button:focus, .five-generation-dialog .dialog-actions button:not(.secondary-action), .kinship-dialog .dialog-actions button:not(.secondary-action) { color: white; border-color: var(--red); background: var(--red); }
+.tree-tools .secondary-action { color: #6f5427; border-color: #9c7c49; background: #fff4d8; }
+#treeToolStatus { flex: 1 1 100%; min-height: 0; color: var(--muted); font-size: .76rem; }
+#treeToolStatus:empty { display: none; }
 .five-generation-selection { padding: .65rem .8rem; color: var(--red-dark); border-left: 3px solid var(--red); background: #fff4df; }
 .five-generation-modes { display: grid; gap: .55rem; margin: 1rem 0; padding: 1rem; border: 1px solid #dfcda9; border-radius: .7rem; }
 .five-generation-modes label { display: flex; align-items: flex-start; gap: .65rem; padding: .65rem; border-radius: .5rem; cursor: pointer; }
 .five-generation-modes label:has(input:checked) { background: #fff0d2; }
 .five-generation-modes span { display: grid; gap: .2rem; }
 .five-generation-modes small { color: var(--muted); }
-.five-generation-dialog .dialog-actions { display: flex; justify-content: flex-end; }
+.five-generation-dialog .dialog-actions, .kinship-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 .five-generation-dialog .dialog-actions button:disabled { opacity: .5; cursor: not-allowed; }
 .five-generation-result-heading h2, .five-generation-result-heading p { margin: 0; }
 .five-generation-result-heading p { margin-top: .35rem; color: var(--muted); }
@@ -127,7 +120,17 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 .five-generation-level + .five-generation-level::before { content: ''; position: absolute; top: -2rem; left: 4rem; height: 2rem; border-left: 2px solid var(--line); }
 .five-generation-level h3 { margin: 0 0 .75rem; color: var(--red); font-size: 1rem; }
 .five-generation-empty { margin: 0; padding: 1rem; color: var(--muted); border: 1px dashed #d8c7a8; border-radius: .55rem; }
-@media (max-width: 640px) { .five-generation-entry > div { flex-basis: 100%; } .five-generation-entry button { flex: 1; } }
+.kinship-selection { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin: 1rem 0; }
+.kinship-selection p { margin: 0; padding: .65rem; border: 1px solid #eadbc2; border-radius: .45rem; background: #fffaf0; }
+.kinship-result section { margin: .8rem 0; padding: .8rem; border: 1px solid #dfcda9; border-radius: .6rem; }
+.kinship-result h3 { margin: 0 0 .65rem; color: var(--red); }
+.kinship-result dl { display: grid; gap: .45rem; margin: 0; }
+.kinship-result dl div { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem; }
+.kinship-result dt { color: var(--muted); }
+.kinship-result dd { margin: 0; font-weight: 700; }
+.kinship-failure { padding: 1rem; color: var(--red); background: #fff0eb; }
+#kinshipDictionaryFields { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; max-height: 55vh; overflow: auto; padding: .25rem; }
+@media (max-width: 640px) { .search-result-item { grid-template-columns: 1fr; } .search-result-actions { grid-template-columns: repeat(2, 1fr); } .tree-tools > button, .tree-tools > label { flex: 1 1 calc(50% - .45rem); } .tree-tools select, .tree-tools button { width: 100%; } .kinship-selection, #kinshipDictionaryFields { grid-template-columns: 1fr; } .kinship-result dl div { grid-template-columns: 1fr; gap: .1rem; } }
 
 .tree-panel { overflow-x: auto; padding: 1rem 0 2rem; }
 .tree-panel { position: relative; min-height: 28rem; max-height: 76vh; overflow: auto; overscroll-behavior: contain; }
@@ -267,18 +270,6 @@ dd { margin: 0; }
 .action-bar button, .primary-action, .review-actions button { padding: .65rem .9rem; color: var(--red-dark); border: 1px solid #cbaa72; border-radius: .55rem; background: #fffaf0; cursor: pointer; }
 .action-bar .admin-button, .primary-action, .review-actions button:first-child { color: white; border-color: var(--red); background: var(--red); }
 .action-bar p { flex-basis: 100%; min-height: 1.2rem; margin: 0; color: var(--red); font-size: .82rem; }
-.generation-filter { max-width: 1100px; margin: 0 auto .75rem; display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
-.generation-filter strong { margin-right: .25rem; color: var(--muted); font-size: .82rem; }
-.generation-filter button { padding: .5rem .75rem; color: var(--red-dark); border: 1px solid #d8c7a8; border-radius: 999px; background: #fffdf8; cursor: pointer; }
-.generation-filter button.active { color: white; border-color: var(--red); background: var(--red); }
-.generation-filter .branch-rule-button { margin-left: auto; border-style: dashed; }
-.generation-filter .branch-rule-button[aria-pressed="true"] { color: white; border-color: #6f5427; background: #6f5427; }
-.relationship-bar { max-width: 1100px; margin: 0 auto 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; padding: .75rem; border: 1px solid #dfcda9; border-radius: .7rem; background: rgba(255,253,248,.8); }
-.relationship-bar strong { color: var(--red); }
-.relationship-bar label { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .82rem; }
-.relationship-bar select, .relationship-bar button { padding: .5rem .65rem; border: 1px solid #d8c7a8; border-radius: .45rem; background: white; }
-.relationship-bar button { color: white; border-color: var(--red); background: var(--red); cursor: pointer; }
-#relationshipStatus { color: var(--muted); font-size: .8rem; }
 .count-badge { display: inline-grid; min-width: 1.25rem; height: 1.25rem; place-items: center; margin-left: .25rem; padding: 0 .25rem; color: var(--red); border-radius: 999px; background: white; font-size: .72rem; }
 .count-badge.empty { opacity: .65; }
 .form-dialog, .review-dialog { width: min(94vw, 42rem); }
@@ -451,6 +442,7 @@ dd { margin: 0; }
       <button id="addMemberButton" type="button">＋ 添加成员</button>
       <button id="editMemberButton" type="button">编辑最近查看人物</button>
       <button id="reviewButton" type="button" class="admin-button">管理员审核 <span id="reviewCount" class="count-badge">0</span></button>
+      <button id="editKinshipDictionaryButton" type="button" class="admin-button" hidden>维护本家称谓</button>
       <p id="actionStatus" role="status" aria-live="polite"></p>
     </section>
     <nav class="view-switcher" aria-label="族谱浏览方式">
@@ -469,30 +461,15 @@ dd { margin: 0; }
       <div id="generationExplorer" class="generation-explorer"></div>
     </section>
     <div class="view-panel" data-view-panel="tree">
-    <section class="generation-filter" aria-label="按代查看">
-      <strong>快捷查看</strong>
-      <button type="button" class="active" data-generation="all">全部族谱</button>
-      <button type="button" data-generation="1">第一代</button>
-      <button type="button" data-generation="2">第二代</button>
-      <button type="button" data-generation="3">第三代</button>
-      <button type="button" data-generation="4">第四代</button>
-      <button type="button" data-generation="5">第五代</button>
-      <button type="button" data-generation="6">第六代</button>
-      <button type="button" data-generation="7">第七代</button>
-      <button type="button" data-generation="8">第八代</button>
-      <button id="branchBoundaryButton" type="button" class="branch-rule-button">生成人物小型树谱</button>
-    </section>
-    <section class="relationship-bar" aria-label="跨代关系查询">
-      <strong>跨代关系</strong>
-      <div class="person-tree-search"><label>姓名<input id="relationshipSearch" type="search" autocomplete="off" placeholder="输入姓名、同音字或拼音"></label><div id="relationshipResults" class="search-results" hidden></div></div>
-      <button id="showRelationshipButton" type="button">查询人物</button>
-      <span id="relationshipStatus" role="status"></span>
-    </section>
-    <section class="five-generation-entry" aria-label="五代查询">
-      <div><strong>五代查询</strong><span>本人计入五代，可向上、向下或居中查看</span></div>
-      <button id="openFiveGenerationQuery" type="button">打开五代查询</button>
+    <section class="tree-tools" aria-label="树状族谱工具">
+      <button id="showFullTreeButton" type="button" class="active">全部族谱</button>
+      <label><span class="visually-hidden">按代查看</span><select id="generationSelect" aria-label="按代查看"><option value="" selected>按代查看</option><option value="all">全部族谱</option><option value="1">第1代</option><option value="2">第2代</option><option value="3">第3代</option><option value="4">第4代</option><option value="5">第5代</option><option value="6">第6代</option><option value="7">第7代</option><option value="8">第8代</option></select></label>
+      <button id="openKinshipQuery" type="button">关系与称谓</button>
+      <button id="openFiveGenerationQuery" type="button">五代谱</button>
+      <button id="exportTreeButton" type="button">导出PDF</button>
       <button id="returnFullTree" type="button" class="secondary-action" hidden>返回完整族谱</button>
-      <span id="fiveGenerationStatus" role="status" aria-live="polite"></span>
+      <span id="treeToolStatus" role="status" aria-live="polite"></span>
+      <span id="fiveGenerationStatus" hidden></span>
     </section>
     <section class="tree-panel">
       <div class="zoom-toolbar" aria-label="族谱缩放控制">
@@ -535,19 +512,29 @@ dd { margin: 0; }
   <dialog id="fiveGenerationDialog" class="form-dialog five-generation-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
     <h2>五代查询</h2>
-    <p class="dialog-intro">选择中心人物和查询方向。无论哪种模式，结果固定为五代并包含本人。</p>
-    <div class="five-generation-search">
-      <label>中心人物<input id="fiveGenerationSearch" type="search" autocomplete="off" placeholder="输入姓名、同音字或拼音"></label>
-      <div id="fiveGenerationResults" class="search-results" hidden></div>
-    </div>
-    <p id="fiveGenerationSelection" class="five-generation-selection" hidden></p>
+    <p class="dialog-intro">中心人物统一从页面顶部“搜索成员”选择。无论哪种模式，结果固定为五代并包含本人。</p>
+    <p id="fiveGenerationSelection" class="five-generation-selection">尚未选择中心人物</p>
     <fieldset class="five-generation-modes">
       <legend>查询方式</legend>
       <label><input type="radio" name="fiveGenerationMode" value="ANCESTORS_5" checked><span><strong>向上五代</strong><small>本人＋向上4代祖先</small></span></label>
       <label><input type="radio" name="fiveGenerationMode" value="DESCENDANTS_5"><span><strong>向下五代</strong><small>本人＋向下4代后代</small></span></label>
       <label><input type="radio" name="fiveGenerationMode" value="CENTERED_5"><span><strong>居中五代</strong><small>上2代＋本人＋下2代</small></span></label>
     </fieldset>
-    <div class="dialog-actions"><button id="runFiveGenerationQuery" type="button" disabled>生成五代族谱</button></div>
+    <div class="dialog-actions"><button id="chooseFiveGenerationPerson" type="button" class="secondary-action">从顶部搜索选择</button><button id="runFiveGenerationQuery" type="button" disabled>生成五代族谱</button></div>
+  </dialog>
+  <dialog id="kinshipDialog" class="form-dialog kinship-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <h2>关系与称谓</h2>
+    <p class="dialog-intro">依次从页面顶部“搜索成员”选择人物 A 和人物 B，系统会根据当前家谱关系计算。</p>
+    <div id="kinshipSelection" class="kinship-selection"></div>
+    <div id="kinshipResult" class="kinship-result" role="status"></div>
+    <div class="dialog-actions"><button id="chooseKinshipPeople" type="button">选择人物 A</button><button id="resetKinshipQuery" type="button" class="secondary-action">重新选择</button></div>
+  </dialog>
+  <dialog id="kinshipDictionaryDialog" class="form-dialog kinship-dictionary-dialog">
+    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+    <h2>维护本家称谓</h2>
+    <p class="dialog-intro">只覆盖凌氏家族的实际称呼；关系计算与标准称谓不会改变。</p>
+    <form id="kinshipDictionaryForm" class="member-form"><div id="kinshipDictionaryFields"></div><button type="submit" class="primary-action">保存本家称谓</button></form>
   </dialog>
   <dialog id="loginDialog" class="form-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
@@ -592,6 +579,8 @@ dd { margin: 0; }
     </div>
     <div id="reviewList"></div>
   </dialog>
+  
+  
   
   
   
@@ -677,6 +666,237 @@ dd { margin: 0; }
 
   window.FiveGenerationQuery = { MODES, resolve };
 })();
+
+(function (root) {
+  const STEP_LABELS = Object.freeze({
+    father: '父亲', mother: '母亲', son: '儿子', daughter: '女儿', child: '子女',
+    spouse_male: '丈夫', spouse_female: '妻子', spouse: '配偶',
+    older_brother: '哥哥', younger_brother: '弟弟', brother: '兄弟',
+    older_sister: '姐姐', younger_sister: '妹妹', sister: '姐妹'
+  });
+
+  function yearOf(person) {
+    const match = String(person?.birthYear || '').match(/\d{4}/);
+    return match ? Number(match[0]) : null;
+  }
+
+  function siblingStep(from, to) {
+    const gender = to?.gender;
+    const fromYear = yearOf(from);
+    const toYear = yearOf(to);
+    if (gender === '男') {
+      if (fromYear != null && toYear != null && fromYear !== toYear) return toYear < fromYear ? 'older_brother' : 'younger_brother';
+      return 'brother';
+    }
+    if (gender === '女') {
+      if (fromYear != null && toYear != null && fromYear !== toYear) return toYear < fromYear ? 'older_sister' : 'younger_sister';
+      return 'sister';
+    }
+    return 'sibling';
+  }
+
+  function build(data) {
+    const peopleById = new Map(data.people.map(person => [person.id, person]));
+    const adjacency = new Map(data.people.map(person => [person.id, []]));
+    const add = (from, to, type, weight = 1) => {
+      if (!peopleById.has(from) || !peopleById.has(to)) return;
+      adjacency.get(from).push({ fromId: from, toId: to, type, weight });
+    };
+    data.people.forEach(child => {
+      if (child.fatherId) { add(child.id, child.fatherId, 'father'); add(child.fatherId, child.id, child.gender === '男' ? 'son' : child.gender === '女' ? 'daughter' : 'child'); }
+      if (child.motherId) { add(child.id, child.motherId, 'mother'); add(child.motherId, child.id, child.gender === '男' ? 'son' : child.gender === '女' ? 'daughter' : 'child'); }
+    });
+    (data.unions || []).forEach(union => {
+      const a = peopleById.get(union.partnerAId), b = peopleById.get(union.partnerBId);
+      if (!a || !b) return;
+      add(a.id, b.id, b.gender === '男' ? 'spouse_male' : b.gender === '女' ? 'spouse_female' : 'spouse', 1.15);
+      add(b.id, a.id, a.gender === '男' ? 'spouse_male' : a.gender === '女' ? 'spouse_female' : 'spouse', 1.15);
+    });
+    const siblingGroups = new Map();
+    data.people.forEach(person => {
+      const key = person.fatherId || person.motherId ? `${person.fatherId || ''}|${person.motherId || ''}` : '';
+      if (!key) return;
+      if (!siblingGroups.has(key)) siblingGroups.set(key, []);
+      siblingGroups.get(key).push(person);
+    });
+    siblingGroups.forEach(siblings => siblings.forEach(from => siblings.forEach(to => {
+      if (from.id !== to.id) add(from.id, to.id, siblingStep(from, to), 1.05);
+    })));
+    return { peopleById, adjacency };
+  }
+
+  function compareState(a, b) {
+    return a.cost - b.cost || a.spouses - b.spouses || a.edges.length - b.edges;
+  }
+
+  function find(data, fromId, toId, options = {}) {
+    const { peopleById, adjacency } = build(data);
+    if (!peopleById.has(fromId) || !peopleById.has(toId)) return null;
+    if (fromId === toId) return { fromId, toId, personIds: [fromId], edges: [], steps: [], chainLabels: ['本人'], generationDifference: 0, cost: 0 };
+    const maxEdges = options.maxEdges || 12;
+    const queue = [{ id: fromId, cost: 0, spouses: 0, edges: [], visited: new Set([fromId]) }];
+    const best = new Map();
+    while (queue.length) {
+      queue.sort(compareState);
+      const current = queue.shift();
+      const bestKey = best.get(current.id);
+      if (bestKey && compareState(current, bestKey) > 0) continue;
+      best.set(current.id, current);
+      if (current.id === toId) {
+        const from = peopleById.get(fromId), to = peopleById.get(toId);
+        const steps = current.edges.map(edge => edge.type);
+        return {
+          fromId, toId, edges: current.edges, steps,
+          personIds: [fromId, ...current.edges.map(edge => edge.toId)],
+          chainLabels: current.edges.map(edge => STEP_LABELS[edge.type] || '亲属'),
+          generationDifference: Number(to.generation || 0) - Number(from.generation || 0),
+          cost: current.cost
+        };
+      }
+      if (current.edges.length >= maxEdges) continue;
+      (adjacency.get(current.id) || []).forEach(edge => {
+        if (current.visited.has(edge.toId)) return;
+        const spouses = current.spouses + (edge.type.startsWith('spouse') ? 1 : 0);
+        if (spouses > 2) return;
+        const next = { id: edge.toId, cost: current.cost + edge.weight, spouses, edges: [...current.edges, edge], visited: new Set([...current.visited, edge.toId]) };
+        const known = best.get(next.id);
+        if (!known || compareState(next, known) <= 0) queue.push(next);
+      });
+    }
+    return null;
+  }
+
+  const api = Object.freeze({ build, find, yearOf, siblingStep, STEP_LABELS });
+  root.KinshipGraph = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+(function (root) {
+  const BROTHERS = new Set(['older_brother', 'younger_brother', 'brother']);
+  const SISTERS = new Set(['older_sister', 'younger_sister', 'sister']);
+  const STORAGE_KEY = 'lingshi-family-custom-kinship-v1';
+  const BASE = Object.freeze({
+    self: { standard: '本人', northeast: '本人', lingyuan: '本人' },
+    father: { standard: '父亲', northeast: '爸爸', lingyuan: '爸' },
+    mother: { standard: '母亲', northeast: '妈妈', lingyuan: '妈' },
+    son: { standard: '儿子', northeast: '儿子', lingyuan: '儿子' },
+    daughter: { standard: '女儿', northeast: '闺女', lingyuan: '闺女' },
+    spouse_male: { standard: '丈夫', northeast: '丈夫', lingyuan: '丈夫' },
+    spouse_female: { standard: '妻子', northeast: '媳妇', lingyuan: '媳妇' },
+    older_brother: { standard: '哥哥', northeast: '大哥', lingyuan: '大哥' },
+    younger_brother: { standard: '弟弟', northeast: '弟弟', lingyuan: '兄弟' },
+    older_sister: { standard: '姐姐', northeast: '大姐', lingyuan: '大姐' },
+    younger_sister: { standard: '妹妹', northeast: '妹妹', lingyuan: '妹妹' },
+    paternal_grandfather: { standard: '祖父', northeast: '爷爷', lingyuan: '爷爷' },
+    paternal_grandmother: { standard: '祖母', northeast: '奶奶', lingyuan: '奶奶' },
+    maternal_grandfather: { standard: '外祖父', northeast: '姥爷', lingyuan: '姥爷' },
+    maternal_grandmother: { standard: '外祖母', northeast: '姥姥', lingyuan: '姥姥' },
+    paternal_older_uncle: { standard: '伯父', northeast: '大爷', lingyuan: '大爷' },
+    paternal_younger_uncle: { standard: '叔父', northeast: '叔叔', lingyuan: '叔叔' },
+    paternal_uncle: { standard: '叔伯', northeast: '叔伯', lingyuan: '叔叔' },
+    paternal_aunt: { standard: '姑母', northeast: '姑姑', lingyuan: '姑' },
+    maternal_uncle: { standard: '舅父', northeast: '舅舅', lingyuan: '舅' },
+    maternal_aunt: { standard: '姨母', northeast: '姨', lingyuan: '姨' },
+    nephew: { standard: '侄子', northeast: '大侄子', lingyuan: '侄子' },
+    niece: { standard: '侄女', northeast: '侄女', lingyuan: '侄女' },
+    grandson: { standard: '孙子', northeast: '孙子', lingyuan: '孙子' },
+    granddaughter: { standard: '孙女', northeast: '孙女', lingyuan: '孙女' },
+    maternal_grandson: { standard: '外孙', northeast: '外孙', lingyuan: '外孙' },
+    maternal_granddaughter: { standard: '外孙女', northeast: '外孙女', lingyuan: '外孙女' }
+  });
+
+  function relationKey(steps) {
+    if (!steps.length) return 'self';
+    if (steps.length === 1) return steps[0];
+    const [a, b] = steps;
+    if (steps.length === 2) {
+      if (a === 'father' && b === 'father') return 'paternal_grandfather';
+      if (a === 'father' && b === 'mother') return 'paternal_grandmother';
+      if (a === 'mother' && b === 'father') return 'maternal_grandfather';
+      if (a === 'mother' && b === 'mother') return 'maternal_grandmother';
+      if (a === 'father' && b === 'older_brother') return 'paternal_older_uncle';
+      if (a === 'father' && b === 'younger_brother') return 'paternal_younger_uncle';
+      if (a === 'father' && BROTHERS.has(b)) return 'paternal_uncle';
+      if (a === 'father' && SISTERS.has(b)) return 'paternal_aunt';
+      if (a === 'mother' && BROTHERS.has(b)) return 'maternal_uncle';
+      if (a === 'mother' && SISTERS.has(b)) return 'maternal_aunt';
+      if ((BROTHERS.has(a) || SISTERS.has(a)) && b === 'son') return 'nephew';
+      if ((BROTHERS.has(a) || SISTERS.has(a)) && b === 'daughter') return 'niece';
+      if (a === 'son' && b === 'son') return 'grandson';
+      if (a === 'son' && b === 'daughter') return 'granddaughter';
+      if (a === 'daughter' && b === 'son') return 'maternal_grandson';
+      if (a === 'daughter' && b === 'daughter') return 'maternal_granddaughter';
+    }
+    return steps.join('>');
+  }
+
+  function sharedSiblingGroup(person, data) {
+    if (!person || (!person.fatherId && !person.motherId)) return [];
+    return data.people.filter(candidate => candidate.id !== person.id &&
+      ((person.fatherId && candidate.fatherId === person.fatherId) || (person.motherId && candidate.motherId === person.motherId)));
+  }
+
+  function rankInfo(person, data) {
+    const siblings = [...sharedSiblingGroup(person, data), person].filter(candidate => candidate.gender === person.gender);
+    const withYears = siblings.map(candidate => ({ person: candidate, year: root.KinshipGraph.yearOf(candidate) }));
+    if (withYears.some(item => item.year == null) || new Set(withYears.map(item => item.year)).size !== withYears.length) return null;
+    withYears.sort((a, b) => a.year - b.year);
+    const index = withYears.findIndex(item => item.person.id === person.id);
+    return index < 0 ? null : { rank: index + 1, count: withYears.length, isLast: index === withYears.length - 1 };
+  }
+
+  function numbered(prefix, rank, isLast, allowLast = true) {
+    if (allowLast && isLast && rank > 1) return `老${prefix}`;
+    const numerals = ['', '大', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    return `${numerals[rank] || `第${rank}`} ${prefix}`.replace(' ', '');
+  }
+
+  function regionalRankedTerm(key, target, data) {
+    if (!['paternal_older_uncle', 'paternal_younger_uncle', 'paternal_uncle', 'paternal_aunt', 'maternal_uncle'].includes(key)) return null;
+    const info = rankInfo(target, data);
+    if (!info) return `${BASE[key].lingyuan}（排行未知）`;
+    if (key === 'paternal_older_uncle') return info.rank === 1 ? '大爷' : `${['','一','二','三','四','五','六','七','八','九','十'][info.rank] || `第${info.rank}`}大爷`;
+    if (key === 'paternal_younger_uncle' || key === 'paternal_uncle') return numbered('叔', info.rank, info.isLast);
+    if (key === 'maternal_uncle') return numbered('舅', info.rank, info.isLast);
+    if (key === 'paternal_aunt') return numbered('姑', info.rank, info.isLast);
+    return null;
+  }
+
+  function loadCustom(storage) {
+    try { return JSON.parse(storage?.getItem(STORAGE_KEY) || '{}') || {}; } catch { return {}; }
+  }
+  function saveCustom(values, storage) {
+    storage?.setItem(STORAGE_KEY, JSON.stringify(values || {}));
+    return values || {};
+  }
+
+  function describe(path, data, options = {}) {
+    if (!path) return null;
+    const key = relationKey(path.steps);
+    const target = data.people.find(person => person.id === path.toId);
+    const configured = BASE[key];
+    const generic = path.chainLabels.length ? path.chainLabels.join(' → ') : '本人';
+    const standard = configured?.standard || generic;
+    const northeast = configured?.northeast || standard;
+    const ranked = configured ? regionalRankedTerm(key, target, data) : null;
+    const lingyuan = ranked || configured?.lingyuan || standard;
+    const custom = (options.custom || loadCustom(options.storage || root.localStorage))[key] || '';
+    const primary = custom || lingyuan;
+    const difference = path.generationDifference;
+    const generationText = difference === 0 ? '同辈' : difference < 0 ? `上${Math.abs(difference)}辈` : `下${difference}辈`;
+    return { key, chain: generic, standard, northeast, lingyuan, custom, primary, generationDifference: difference, generationText };
+  }
+
+  const api = Object.freeze({
+    STANDARD: Object.freeze(Object.fromEntries(Object.entries(BASE).map(([key, value]) => [key, value.standard]))),
+    NORTHEAST: Object.freeze(Object.fromEntries(Object.entries(BASE).map(([key, value]) => [key, value.northeast]))),
+    LINGYUAN_CHAOYANG: Object.freeze(Object.fromEntries(Object.entries(BASE).map(([key, value]) => [key, value.lingyuan]))),
+    FAMILY_CUSTOM: STORAGE_KEY,
+    relationKey, rankInfo, describe, loadCustom, saveCustom
+  });
+  root.KinshipDictionary = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
 
 /* Family directory, five-generation tables and member detail workflows. */
 window.installFamilyFeatures = function (api) {
@@ -807,7 +1027,8 @@ window.installFamilyFeatures = function (api) {
     printWindow.document.open();printWindow.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>凌氏家谱-${esc(kind)}</title><style>${css}\nbody{background:white;margin:0;color:black;font:16px 'Microsoft YaHei',serif} .print-page,.ou-page{break-after:page;padding:12mm;box-sizing:border-box;width:100%;background:white} .print-page p{line-height:1.8} .print-couple,.print-children{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.print-children{border-top:2px solid #755a31;margin-top:30px;padding-top:20px}.print-person{border:1px solid #755a31;padding:15px;min-width:100px}.ou-page table{width:100%}.ou-page td{height:36mm} @page{size:A4 landscape;margin:8mm} .print-controls{padding:20px;background:#fff4da}@media print{.print-controls{display:none}button{color:black;background:none;border:0}.ou-page{box-shadow:none;margin:0}}</style></head><body><div class="print-controls">共 ${pages.length} 页。点击打印，在目标打印机中选择“另存为 PDF”。<button onclick="window.print()">打印 / 保存 PDF</button></div>${pages.join('')}</body></html>`);printWindow.document.close();
     printWindow.addEventListener('load',()=>printWindow.print(),{once:true});
   }
-  ['tree','hierarchy','ebook'].forEach(kind=>{ const bar=el('div','','member-tools export-tools');bar.append(button('导出 PDF',()=>exportPdf(kind)),el('small',kind==='tree'?'按家庭分页导出完整族谱':'打印预览中选择“另存为 PDF”'));document.querySelector(`[data-view-panel="${kind}"]`).prepend(bar); });
+  ['hierarchy','ebook'].forEach(kind=>{ const bar=el('div','','member-tools export-tools');bar.append(button('导出 PDF',()=>exportPdf(kind)),el('small','打印预览中选择“另存为 PDF”'));document.querySelector(`[data-view-panel="${kind}"]`).prepend(bar); });
+  document.querySelector('#exportTreeButton')?.addEventListener('click',()=>exportPdf('tree'));
   document.querySelectorAll('[data-open-book]').forEach(node=>node.addEventListener('click',()=>{selectedBook=node.dataset.openBook;}));
   document.querySelector('#ebookDialog .ebook-reader-toolbar').append(button('导出本卷 PDF',()=>exportPdf('ebook')));
   function render() {
@@ -1053,9 +1274,8 @@ window.installFamilyFeatures = function (api) {
   const treePanel = document.querySelector(".tree-panel");
   const zoomValue = document.querySelector("#zoomValue");
   const canvasLockButton = document.querySelector("#canvasLockButton");
-  const relationshipStatus = document.querySelector("#relationshipStatus");
-  const branchBoundaryButton = document.querySelector("#branchBoundaryButton");
-  const relationshipSearch = document.querySelector("#relationshipSearch");
+  const treeToolStatus = document.querySelector("#treeToolStatus");
+  const generationSelect = document.querySelector("#generationSelect");
   const zoomSlider = document.querySelector("#zoomSlider");
   const fitViewButton = document.querySelector("#fitViewButton");
   const loginDialog = document.querySelector("#loginDialog");
@@ -1068,12 +1288,15 @@ window.installFamilyFeatures = function (api) {
   const bookPage = document.querySelector("#bookPage");
   const bookPageStatus = document.querySelector("#bookPageStatus");
   const fiveGenerationDialog = document.querySelector('#fiveGenerationDialog');
-  const fiveGenerationSearch = document.querySelector('#fiveGenerationSearch');
-  const fiveGenerationResults = document.querySelector('#fiveGenerationResults');
   const fiveGenerationSelection = document.querySelector('#fiveGenerationSelection');
   const fiveGenerationStatus = document.querySelector('#fiveGenerationStatus');
   const returnFullTreeButton = document.querySelector('#returnFullTree');
   const runFiveGenerationQueryButton = document.querySelector('#runFiveGenerationQuery');
+  const kinshipDialog = document.querySelector('#kinshipDialog');
+  const kinshipSelection = document.querySelector('#kinshipSelection');
+  const kinshipResult = document.querySelector('#kinshipResult');
+  const editKinshipDictionaryButton = document.querySelector('#editKinshipDictionaryButton');
+  const kinshipDictionaryDialog = document.querySelector('#kinshipDictionaryDialog');
   let lastViewedPerson = null;
   let currentRole = null;
   let reviewFilter = "all";
@@ -1092,6 +1315,9 @@ window.installFamilyFeatures = function (api) {
   let currentBookPage = 0;
   let selectedFiveGenerationPerson = null;
   let activeFiveGenerationQuery = null;
+  let kinshipPersonA = null;
+  let kinshipPersonB = null;
+  let pendingSearchAction = null;
   let features;
   function pinyinInitials(name) {
     return window.FamilyNameSearch.initials(name);
@@ -1256,6 +1482,7 @@ window.installFamilyFeatures = function (api) {
     accountLabel.textContent = role === "admin" ? "已登录：管理员" : "已登录：普通成员";
     loginButton.textContent = "切换身份";
     reviewButton.hidden = role !== "admin";
+    editKinshipDictionaryButton.hidden = role !== "admin";
     actionStatus.textContent = role === "admin" ? "管理员模式：可以审核注册和资料申请。" : "普通成员模式：可以提交资料，审核中心不可见。";
     loginDialog.close();
     features?.renderCommunity();
@@ -1317,46 +1544,60 @@ window.installFamilyFeatures = function (api) {
     return person.gender === "男" ? "孙子" : "孙女";
   }
 
-  function renderMiniTree(person) {
-    clearFiveGenerationMode();
-    lastViewedPerson = person;
-    activateView('tree');
-    tree.replaceChildren();
-    tree.classList.remove('normalized-tree');
-    tree.classList.add('generation-summary-view');
-    enableQuickView();
-    document.querySelectorAll('[data-generation]').forEach(button => button.classList.remove('active'));
-    const section = document.createElement('section');
-    section.className = 'generation-group mini-family-tree';
-    const title = document.createElement('h2'); title.textContent = `${person.name}的小型树状族谱`; section.append(title);
-    const addLevel = (label, units) => {
-      const level = document.createElement('section'); level.className = 'mini-tree-level';
-      const heading = document.createElement('h3'); heading.textContent = label; level.append(heading);
-      const row = document.createElement('div'); row.className = 'generation-card-row';
-      if (units.length) row.append(...units); else { const empty = document.createElement('p'); empty.textContent = '暂无记录'; row.append(empty); }
-      level.append(row); section.append(level);
-    };
-    const father = peopleById.get(person.fatherId), mother = peopleById.get(person.motherId);
-    addLevel('父母', father || mother ? [coupleElement(father || mother, father ? mother : null)] : []);
-    addLevel('本人及配偶', [coupleElement(person, partnerOf(person), '查询人物')]);
-    addLevel('子女及其配偶', childrenOf(person.id).map(child => coupleElement(child, partnerOf(child))));
-    tree.append(section);
-    stats.textContent = `${person.name} · 父母、本人及配偶、子女`;
-    document.querySelector('#relationshipResults').hidden = true;
-    searchResults.hidden = true;
-    relationshipStatus.textContent = '已生成小型树谱，点击人物可查看资料。';
+  function generationGapText(difference) {
+    if (difference === 0) return '同辈';
+    return difference < 0 ? `上一辈${Math.abs(difference) > 1 ? `（相差${Math.abs(difference)}代）` : ''}` : `下一辈${difference > 1 ? `（相差${difference}代）` : ''}`;
   }
 
-  function updateMiniSearch() {
-    const query = relationshipSearch.value.trim();
-    const results = document.querySelector('#relationshipResults'); results.replaceChildren();
-    const found = window.FamilyNameSearch.find(data.people, query);
-    found.forEach(person => {
-      results.append(searchResultButton(person, query, () => { relationshipSearch.value = person.name; renderMiniTree(person); }));
-    });
-    results.hidden = !query;
-    if (query && !found.length) { const empty = document.createElement('p'); empty.className = 'search-empty'; empty.textContent = '没有找到姓名或同音候选'; results.append(empty); }
-    relationshipStatus.textContent = query ? `找到 ${found.length} 位候选，请选择人物` : '输入姓名即可查询，支持同音字、拼音和首字母。';
+  function describeKinship(from, to) {
+    const path = window.KinshipGraph.find(data, from.id, to.id);
+    return path ? { path, terms: window.KinshipDictionary.describe(path, data) } : null;
+  }
+
+  function renderKinshipQuery() {
+    kinshipSelection.innerHTML = `<p><strong>人物 A：</strong>${kinshipPersonA ? escapeHtml(kinshipPersonA.name) : '未选择'}</p><p><strong>人物 B：</strong>${kinshipPersonB ? escapeHtml(kinshipPersonB.name) : '未选择'}</p>`;
+    if (!kinshipPersonA || !kinshipPersonB) {
+      kinshipResult.innerHTML = '<p class="empty-state">请从顶部搜索结果中点击“查询关系”，依次选择两个人物。</p>';
+      document.querySelector('#chooseKinshipPeople').textContent = kinshipPersonA ? '选择人物 B' : '选择人物 A';
+      return;
+    }
+    const forward = describeKinship(kinshipPersonA, kinshipPersonB);
+    const reverse = describeKinship(kinshipPersonB, kinshipPersonA);
+    if (!forward || !reverse) {
+      kinshipResult.innerHTML = '<p class="kinship-failure">当前家谱中暂时无法确定两人的亲属关系。</p>';
+      return;
+    }
+    const row = (label, value) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`;
+    kinshipResult.innerHTML = `
+      <section><h3>${escapeHtml(kinshipPersonA.name)}应如何称呼${escapeHtml(kinshipPersonB.name)}</h3><dl>
+        ${row('关系链', forward.terms.chain)}${row('凌源/朝阳常用称谓', forward.terms.primary)}
+        ${row('标准称谓', forward.terms.standard)}${row('东北常用称谓', forward.terms.northeast)}
+        ${row('相差辈分', generationGapText(forward.path.generationDifference))}
+      </dl></section>
+      <section><h3>反向称谓</h3><p>${escapeHtml(kinshipPersonB.name)}称呼${escapeHtml(kinshipPersonA.name)}：<strong>${escapeHtml(reverse.terms.primary)}</strong> <small>（标准称谓：${escapeHtml(reverse.terms.standard)}）</small></p></section>`;
+  }
+
+  function beginTopSearch(action, message) {
+    pendingSearchAction = action;
+    if (kinshipDialog.open) kinshipDialog.close();
+    if (fiveGenerationDialog.open) fiveGenerationDialog.close();
+    searchInput.value = '';
+    updateSearch('');
+    treeToolStatus.textContent = message;
+    searchInput.focus();
+  }
+
+  function selectKinshipPerson(person) {
+    if (!kinshipPersonA || pendingSearchAction !== 'kinship-b') {
+      kinshipPersonA = person; kinshipPersonB = null;
+      beginTopSearch('kinship-b', `已选择人物 A：${person.name}。请继续搜索人物 B，并点击“查询关系”。`);
+      return;
+    }
+    kinshipPersonB = person;
+    pendingSearchAction = null;
+    renderKinshipQuery();
+    kinshipDialog.showModal();
+    treeToolStatus.textContent = `已计算 ${kinshipPersonA.name} 与 ${kinshipPersonB.name} 的关系。`;
   }
 
   function clearFiveGenerationMode() {
@@ -1396,7 +1637,8 @@ window.installFamilyFeatures = function (api) {
     tree.classList.remove('normalized-tree');
     tree.classList.add('generation-summary-view', 'five-generation-tree');
     enableQuickView();
-    document.querySelectorAll('[data-generation]').forEach(button => button.classList.remove('active'));
+    generationSelect.value = '';
+    document.querySelector('#showFullTreeButton').classList.remove('active');
     const result = document.createElement('section');
     result.className = 'generation-group five-generation-result';
     const heading = document.createElement('div');
@@ -1420,28 +1662,14 @@ window.installFamilyFeatures = function (api) {
     tree.appendChild(result);
     returnFullTreeButton.hidden = false;
     fiveGenerationStatus.textContent = `正在查看：${person.name} · ${activeFiveGenerationQuery.label}`;
+    treeToolStatus.textContent = `正在查看：${person.name} · ${activeFiveGenerationQuery.label}`;
     stats.textContent = `${person.name} · ${activeFiveGenerationQuery.label} · 本人计入5代`;
   }
 
   function selectFiveGenerationPerson(person) {
     selectedFiveGenerationPerson = person;
-    fiveGenerationSearch.value = person.name;
-    fiveGenerationResults.hidden = true;
-    fiveGenerationSelection.hidden = false;
     fiveGenerationSelection.textContent = `已选择：${person.name} · 第${person.generation}代 · ${features.parentText(person)}`;
     runFiveGenerationQueryButton.disabled = false;
-  }
-
-  function updateFiveGenerationSearch() {
-    const query = fiveGenerationSearch.value.trim();
-    selectedFiveGenerationPerson = null;
-    runFiveGenerationQueryButton.disabled = true;
-    fiveGenerationSelection.hidden = true;
-    fiveGenerationResults.replaceChildren();
-    const found = window.FamilyNameSearch.find(data.people, query);
-    found.slice(0, 20).forEach(person => fiveGenerationResults.appendChild(searchResultButton(person, query, () => selectFiveGenerationPerson(person))));
-    if (query && !found.length) { const empty = document.createElement('p'); empty.className = 'search-empty'; empty.textContent = '没有找到姓名或同音候选'; fiveGenerationResults.appendChild(empty); }
-    fiveGenerationResults.hidden = !query;
   }
 
   function sizeQuickView() {
@@ -1508,15 +1736,21 @@ window.installFamilyFeatures = function (api) {
   function openSearchResult(personId) {
     const person = peopleById.get(personId);
     if (!person) return;
+    searchResults.hidden = true;
+    showPerson(person);
+  }
+
+  function locateSearchResult(personId) {
+    const person = peopleById.get(personId);
+    if (!person) return;
     if (!tree.querySelector(`[data-person-id="${personId}"]`)) {
       renderTree();
-      document.querySelectorAll("[data-generation]").forEach((button) => button.classList.toggle("active", button.dataset.generation === "all"));
+      generationSelect.value = '';
+      document.querySelector('#showFullTreeButton').classList.add('active');
     }
     searchResults.hidden = true;
-    window.setTimeout(() => {
-      focusPerson(personId);
-      showPerson(person);
-    }, 100);
+    activateView('tree');
+    window.setTimeout(() => focusPerson(personId), 100);
   }
 
   function setTreeZoom(nextZoom, pointerX) {
@@ -1715,7 +1949,8 @@ window.installFamilyFeatures = function (api) {
     if (review.type === 'add' || review.type === 'edit') features.recordActivity(review);
     updateReviewBadge();
     renderTree();
-    document.querySelectorAll("[data-generation]").forEach((button) => button.classList.toggle("active", button.dataset.generation === "all"));
+    generationSelect.value = '';
+    document.querySelector('#showFullTreeButton').classList.add('active');
     renderReviews();
     actionStatus.textContent = "管理员已批准，族谱已更新。";
     reviewDialog.close();
@@ -1763,7 +1998,7 @@ window.installFamilyFeatures = function (api) {
     cards.forEach(card => { const matched = currentSearchMatches.some(p => p.id === card.dataset.personId); card.classList.toggle('match', matched); card.classList.toggle('dimmed', Boolean(query) && !matched); });
     searchResults.replaceChildren();
     currentSearchMatches.slice(0, 15).forEach((person) => {
-      searchResults.appendChild(searchResultButton(person, query, () => openSearchResult(person.id), true));
+      searchResults.appendChild(searchResultButton(person, query));
     });
     searchResults.hidden = !query;
     if (query && !currentSearchMatches.length) searchResults.innerHTML = '<div class="search-empty">没有匹配人物</div>';
@@ -1771,9 +2006,8 @@ window.installFamilyFeatures = function (api) {
     return currentSearchMatches;
   }
 
-  function searchResultButton(person, query, onSelect, showPartner = false) {
-    const result = document.createElement('button');
-    result.type = 'button';
+  function searchResultButton(person, query) {
+    const result = document.createElement('article');
     result.className = 'search-result-item';
     const label = window.FamilyNameSearch.label(person.name, query);
     if (label.startsWith('同音')) result.classList.add('homophone-result');
@@ -1782,9 +2016,15 @@ window.installFamilyFeatures = function (api) {
     const meta = document.createElement('small'); meta.textContent = `${pinyinInitials(person.name) || '#'} · 第${person.generation}代 · ${person.gender}`;
     const parents = document.createElement('small'); parents.textContent = features ? features.parentText(person) : '';
     const match = document.createElement('small'); match.className = 'search-match-label'; match.textContent = label;
-    details.append(name, meta, parents, match); result.append(details);
-    if (showPartner) { const partner = partnerOf(person); const spouse = document.createElement('em'); spouse.textContent = partner ? `配偶：${partner.name}` : '无配偶记录'; result.append(spouse); }
-    result.addEventListener('click', onSelect);
+    const partner = partnerOf(person); const spouse = document.createElement('em'); spouse.textContent = partner ? `配偶：${partner.name}` : '无配偶记录';
+    details.append(name, meta, parents, spouse, match);
+    const actions = document.createElement('div'); actions.className = 'search-result-actions';
+    const addAction = (text, handler) => { const button = document.createElement('button'); button.type = 'button'; button.textContent = text; button.addEventListener('click', handler); actions.append(button); };
+    addAction('查看资料', () => openSearchResult(person.id));
+    addAction('查询关系', () => selectKinshipPerson(person));
+    addAction('查看五代谱', () => { selectFiveGenerationPerson(person); fiveGenerationDialog.showModal(); });
+    addAction('定位到家谱', () => locateSearchResult(person.id));
+    result.append(details, actions);
     return result;
   }
 
@@ -1795,7 +2035,7 @@ window.installFamilyFeatures = function (api) {
     event.preventDefault();
     const match = updateSearch(event.currentTarget.value)[0];
     if (match && currentSearchMatches.length === 1) openSearchResult(match.id);
-    else searchResults.querySelector('button')?.focus();
+    else searchResults.querySelector('.search-result-actions button')?.focus();
   });
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".global-search-box")) searchResults.hidden = true;
@@ -1841,32 +2081,16 @@ window.installFamilyFeatures = function (api) {
     treePanel.scrollTop = 0;
   });
   canvasLockButton.addEventListener("click", () => setCanvasLocked(!canvasLocked));
-  branchBoundaryButton.addEventListener("click", () => {
-    if (searchInput.value.trim()) { relationshipSearch.value = searchInput.value; updateMiniSearch(); }
-    else if (lastViewedPerson) renderMiniTree(lastViewedPerson);
-    else relationshipStatus.textContent = '输入姓名，在候选列表中选择人物即可生成小型树谱。';
-    relationshipSearch.focus();
-  });
-  document.querySelector("#showRelationshipButton").addEventListener("click", updateMiniSearch);
-  relationshipSearch.addEventListener("input", updateMiniSearch);
-  relationshipSearch.addEventListener("keydown", event => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); updateMiniSearch(); document.querySelector('#relationshipResults button')?.focus(); } });
+  document.querySelector('#openKinshipQuery').addEventListener('click', () => { renderKinshipQuery(); kinshipDialog.showModal(); });
+  document.querySelector('#chooseKinshipPeople').addEventListener('click', () => beginTopSearch(kinshipPersonA ? 'kinship-b' : 'kinship-a', kinshipPersonA ? `人物 A：${kinshipPersonA.name}。请搜索人物 B。` : '请搜索人物 A，并在结果中点击“查询关系”。'));
+  document.querySelector('#resetKinshipQuery').addEventListener('click', () => { kinshipPersonA = null; kinshipPersonB = null; pendingSearchAction = null; renderKinshipQuery(); });
   document.querySelector('#openFiveGenerationQuery').addEventListener('click', () => {
     selectedFiveGenerationPerson = null;
-    fiveGenerationSearch.value = '';
-    fiveGenerationResults.replaceChildren();
-    fiveGenerationResults.hidden = true;
-    fiveGenerationSelection.hidden = true;
+    fiveGenerationSelection.textContent = '尚未选择中心人物';
     runFiveGenerationQueryButton.disabled = true;
     fiveGenerationDialog.showModal();
-    fiveGenerationSearch.focus();
   });
-  fiveGenerationSearch.addEventListener('input', updateFiveGenerationSearch);
-  fiveGenerationSearch.addEventListener('keydown', event => {
-    if (event.key !== 'Enter' || event.isComposing) return;
-    event.preventDefault();
-    updateFiveGenerationSearch();
-    fiveGenerationResults.querySelector('button')?.focus();
-  });
+  document.querySelector('#chooseFiveGenerationPerson').addEventListener('click', () => beginTopSearch('five', '请搜索中心人物，并在结果中点击“查看五代谱”。'));
   runFiveGenerationQueryButton.addEventListener('click', () => {
     if (!selectedFiveGenerationPerson) return;
     const mode = fiveGenerationDialog.querySelector('[name="fiveGenerationMode"]:checked').value;
@@ -1875,14 +2099,43 @@ window.installFamilyFeatures = function (api) {
   });
   returnFullTreeButton.addEventListener('click', () => {
     activateView('tree');
-    document.querySelectorAll('[data-generation]').forEach(button => button.classList.toggle('active', button.dataset.generation === 'all'));
+    generationSelect.value = '';
+    document.querySelector('#showFullTreeButton').classList.add('active');
     renderTree();
+    treeToolStatus.textContent = '已返回完整族谱。';
   });
-  document.querySelectorAll("[data-generation]").forEach((button) => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll("[data-generation]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
-      if (button.dataset.generation === "all") renderTree(); else renderGenerationView(Number(button.dataset.generation));
+  document.querySelector('#showFullTreeButton').addEventListener('click', () => {
+    generationSelect.value = '';
+    document.querySelector('#showFullTreeButton').classList.add('active');
+    renderTree();
+    treeToolStatus.textContent = '';
+  });
+  generationSelect.addEventListener('change', () => {
+    const value = generationSelect.value;
+    if (!value) return;
+    if (value === 'all') renderTree(); else renderGenerationView(Number(value));
+    document.querySelector('#showFullTreeButton').classList.toggle('active', value === 'all');
+    treeToolStatus.textContent = value === 'all' ? '' : `正在查看第${value}代成员。`;
+  });
+  function openKinshipDictionary() {
+    if (currentRole !== 'admin') return;
+    const fields = document.querySelector('#kinshipDictionaryFields');
+    const custom = window.KinshipDictionary.loadCustom(localStorage);
+    fields.replaceChildren();
+    Object.entries(window.KinshipDictionary.STANDARD).forEach(([key, standard]) => {
+      if (key.includes('>')) return;
+      const label = document.createElement('label'); label.textContent = `${standard}（${key}）`;
+      const input = document.createElement('input'); input.name = key; input.value = custom[key] || ''; input.placeholder = `默认：${window.KinshipDictionary.LINGYUAN_CHAOYANG[key] || standard}`;
+      label.append(input); fields.append(label);
     });
+    kinshipDictionaryDialog.showModal();
+  }
+  editKinshipDictionaryButton.addEventListener('click', openKinshipDictionary);
+  document.querySelector('#kinshipDictionaryForm').addEventListener('submit', event => {
+    event.preventDefault(); if (currentRole !== 'admin') return;
+    const values = Object.fromEntries([...new FormData(event.currentTarget).entries()].map(([key, value]) => [key, String(value).trim()]).filter(([, value]) => value));
+    window.KinshipDictionary.saveCustom(values, localStorage);
+    kinshipDictionaryDialog.close(); actionStatus.textContent = '本家称谓字典已保存，仅影响凌源/朝阳优先称谓。';
   });
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
