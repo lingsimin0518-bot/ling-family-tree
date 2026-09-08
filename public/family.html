@@ -1393,17 +1393,17 @@ window.installFamilyFeatures = function (api) {
     const motherName = parents && parents.mother ? parents.mother.name : "未记录";
     const partner = partnerOf(person);
     memberDetail.innerHTML = `
-      <p class="eyebrow">第 ${person.generation} 代${person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 母系后代（随父姓）" : " · 配偶成员"}</p>
-      <h2>${person.name}</h2>
+      <p class="eyebrow">第 ${escapeHtml(person.generation)} 代${person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 母系后代（随父姓）" : " · 配偶成员"}</p>
+      <h2>${escapeHtml(person.name)}</h2>
       <dl>
-        <div><dt>性别</dt><dd>${person.gender}</dd></div>
-        <div><dt>出生年份</dt><dd>${person.birthYear}</dd></div>
-        <div><dt>职业</dt><dd>${person.occupation}</dd></div>
-        <div><dt>配偶</dt><dd>${partner ? partner.name : "未记录"}</dd></div>
-        ${parents ? `<div><dt>父亲</dt><dd>${fatherName}</dd></div><div><dt>母亲</dt><dd>${motherName}</dd></div>` : ""}
+        <div><dt>性别</dt><dd>${escapeHtml(person.gender)}</dd></div>
+        <div><dt>出生年份</dt><dd>${escapeHtml(person.birthYear)}</dd></div>
+        <div><dt>职业</dt><dd>${escapeHtml(person.occupation)}</dd></div>
+        <div><dt>配偶</dt><dd>${escapeHtml(partner ? partner.name : "未记录")}</dd></div>
+        ${parents ? `<div><dt>父亲</dt><dd>${escapeHtml(fatherName)}</dd></div><div><dt>母亲</dt><dd>${escapeHtml(motherName)}</dd></div>` : ""}
         <div><dt>资料状态</dt><dd>${person.synthetic ? "随机测试资料" : "家族原始记录/待考"}</dd></div>
       </dl>
-      <section class="biography"><h3>生平简历</h3><p>${person.biography}</p>${parents ? `<p><strong>父母：</strong>${fatherName}、${motherName}</p>` : ""}</section>
+      <section class="biography"><h3>生平简历</h3><p>${escapeHtml(person.biography)}</p>${parents ? `<p><strong>父母：</strong>${escapeHtml(fatherName)}、${escapeHtml(motherName)}</p>` : ""}</section>
     `;
     memberDialog.showModal();
   }
