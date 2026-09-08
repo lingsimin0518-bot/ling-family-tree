@@ -1,6 +1,6 @@
 # Agent collaboration
 
-- This is the primary working copy at F:\Projects\ling-family-tree.
+- This is the primary working copy at F:\族谱程序\family-tree.
 - Read README.md and check git status before editing. Preserve others' uncommitted changes.
 - Keep this repository private: public/family.html and Git history contain family information.
 - Do not commit credentials, chat exports, local databases, dependency caches, or deployment archives.
