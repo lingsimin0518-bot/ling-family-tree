@@ -36,3 +36,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# local deployment archives and package caches
+/site-deploy*.tar.gz
+/.pnpm-store/
+/.dev.vars
+/.dev.vars.*
+*.log
