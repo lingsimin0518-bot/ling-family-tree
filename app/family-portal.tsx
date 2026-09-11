@@ -120,7 +120,7 @@ export default function FamilyPortal() {
     <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span><button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
     {message && <div className="toast" onClick={() => setMessage('')}>{message}<span>×</span></div>}
     {loading && <div className="loading">正在读取族谱…</div>}
-    {current?.source_type === 'LEGACY_STATIC' && <iframe title="凌氏家谱" src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}
+    {current?.source_type === 'LEGACY_STATIC' && <iframe title={current.name} src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}
     {current?.source_type === 'DATABASE' && <DatabaseTree tree={tree} onAdd={setAddTarget} onClaim={claim} onManage={manage} />}
     {showFamilies && <div className="veil"><section className="family-dialog"><button className="close" onClick={() => setShowFamilies(false)}>×</button><h2>我的族谱</h2><p>一个账号可以加入多本族谱，切换后所有人物与资料互不混用。</p>
       <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><div className="family-row-actions"><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button>{family.role==='OWNER'&&family.source_type!=='LEGACY_STATIC'&&<button className="danger-link" onClick={()=>{setDeleteTarget(family);setDeleteName('')}}>删除</button>}</div></article>)}</div>
@@ -145,8 +145,8 @@ function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
     finally { setSubmitting(false); }
   };
   return <main className="auth-page"><section className="auth-card">
-    <div className="auth-mark">凌</div><p className="auth-eyebrow">凌氏家谱</p><h1>{mode==='login'?'登录族谱':'创建族谱账号'}</h1>
-    <p className="auth-intro">账号只用于登录。真实姓名、世代和亲属资料请在进入族谱后另行填写。</p>
+    <p className="auth-eyebrow">记录家族 · 传承记忆</p><h1>家谱</h1>
+    <p className="auth-intro">{mode==='login'?'登录后查看和管理您已加入的族谱。':'注册只创建登录账号，真实姓名、世代和亲属资料请在进入族谱后另行填写。'}</p>
     <div className="auth-tabs"><button className={mode==='login'?'active':''} onClick={()=>{setMode('login');setError('')}}>登录</button><button className={mode==='register'?'active':''} onClick={()=>{setMode('register');setError('')}}>注册</button></div>
     <form className="auth-form" onSubmit={submit}>
       <label>用户名<input name="username" required minLength={3} maxLength={32} autoComplete="username" placeholder="3—32个字符" /></label>

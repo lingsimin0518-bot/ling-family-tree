@@ -13,8 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: '我的族谱',
+  title: '家谱',
+  applicationName: '家谱',
   description: '支持多本独立族谱的家族资料管理网站',
+  openGraph: {
+    title: '家谱',
+    description: '支持多本独立族谱的家族资料管理网站',
+    siteName: '家谱',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: '家谱',
+    description: '支持多本独立族谱的家族资料管理网站',
+  },
 };
 
 export default function RootLayout({

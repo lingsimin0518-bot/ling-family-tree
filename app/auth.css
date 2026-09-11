@@ -3,10 +3,9 @@
 .plain-button{border:1px solid #efd39a66;background:transparent;color:#fff8e8;border-radius:9px;padding:8px 12px;cursor:pointer}
 .auth-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 10%,#fffaf0 0,#f5ead7 55%,#ead7b9 100%);color:#38251c}
 .auth-card{width:min(610px,100%);background:#fffaf2;border:2px solid #c99a50;border-radius:24px;padding:clamp(24px,5vw,46px);box-shadow:0 25px 70px #5b321b2b}
-.auth-mark{width:72px;height:72px;border:4px double #9b2d28;border-radius:50%;display:grid;place-items:center;margin:auto;color:#8e2925;font:700 34px serif}
-.auth-eyebrow{text-align:center;color:#a06e28;letter-spacing:.18em;margin:12px 0 3px}
+.auth-eyebrow{text-align:center;color:#a06e28;letter-spacing:.16em;margin:0 0 8px}
 .auth-card h1{text-align:center;font:700 clamp(30px,5vw,42px) serif;color:#7e2622;margin:0}
-.auth-intro{text-align:center;line-height:1.7;color:#766053;margin:10px auto 20px;max-width:470px}
+.auth-intro{text-align:center;line-height:1.7;color:#766053;margin:12px auto 20px;max-width:470px;min-height:28px}
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid #d6b47d;border-radius:11px;padding:4px;background:#f7ecd9}
 .auth-tabs button{border:0;border-radius:8px;padding:10px;background:transparent;color:#6e5141;font:700 16px inherit;cursor:pointer}
 .auth-tabs button.active{background:#922d28;color:white;box-shadow:0 3px 10px #641c1933}
