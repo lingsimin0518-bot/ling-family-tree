@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { calculateGenerations, type FamilyRelationship } from './generation-model';
+import { requireUser } from './auth';
 
 export const LEGACY_FAMILY_ID = 'family-lingshi-existing';
 export type FamilyRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
@@ -11,22 +12,10 @@ function db() {
   return binding;
 }
 
-export function currentUser(request: Request) {
-  const id = request.headers.get('oai-authenticated-user-id');
-  if (!id) throw new Response('请先登录后使用族谱管理功能', { status: 401 });
-  return {
-    id,
-    email: request.headers.get('oai-authenticated-user-email') ?? '',
-    name: request.headers.get('oai-authenticated-user-name') ?? '族人',
-  };
-}
-
 export async function ensureUser(request: Request) {
-  const user = currentUser(request);
+  const user = await requireUser(request);
   const now = new Date().toISOString();
   await db().batch([
-    db().prepare('INSERT OR IGNORE INTO users (id,email,display_name,created_at) VALUES (?,?,?,?)').bind(user.id, user.email, user.name, now),
-    db().prepare('UPDATE users SET email=?, display_name=? WHERE id=?').bind(user.email, user.name, user.id),
     db().prepare("INSERT OR IGNORE INTO families (id,name,description,join_code,source_type,created_by,created_at) VALUES (?,?,?,?,?,?,?)").bind(LEGACY_FAMILY_ID, '凌氏家谱', '保留的原有凌氏家谱', 'LINGSHI', 'LEGACY_STATIC', user.id, now),
   ]);
   const owner = await db().prepare('SELECT user_id FROM family_users WHERE family_id=? LIMIT 1').bind(LEGACY_FAMILY_ID).first();
@@ -91,10 +80,10 @@ export async function getFamilyTree(userId: string, familyId: string) {
     binding.prepare('SELECT * FROM announcements WHERE family_id=? ORDER BY created_at DESC').bind(familyId).all(),
     binding.prepare('SELECT * FROM media WHERE family_id=?').bind(familyId).all(),
     canReview
-      ? binding.prepare('SELECT pc.*,p.name person_name,u.display_name user_name FROM person_claims pc JOIN persons p ON p.id=pc.person_id AND p.family_id=pc.family_id JOIN users u ON u.id=pc.user_id WHERE pc.family_id=? ORDER BY pc.created_at DESC').bind(familyId).all()
+      ? binding.prepare('SELECT pc.*,p.name person_name,COALESCE(u.nickname,u.display_name,u.username) user_name FROM person_claims pc JOIN persons p ON p.id=pc.person_id AND p.family_id=pc.family_id JOIN users u ON u.id=pc.user_id WHERE pc.family_id=? ORDER BY pc.created_at DESC').bind(familyId).all()
       : binding.prepare('SELECT * FROM person_claims WHERE family_id=? AND user_id=?').bind(familyId, userId).all(),
     canReview
-      ? binding.prepare('SELECT fu.user_id,fu.role,fu.joined_at,u.display_name,u.email FROM family_users fu JOIN users u ON u.id=fu.user_id WHERE fu.family_id=? ORDER BY fu.joined_at').bind(familyId).all()
+      ? binding.prepare('SELECT fu.user_id,fu.role,fu.joined_at,COALESCE(u.nickname,u.display_name,u.username) display_name,u.email FROM family_users fu JOIN users u ON u.id=fu.user_id WHERE fu.family_id=? ORDER BY fu.joined_at').bind(familyId).all()
       : Promise.resolve({ results: [] }),
   ]);
   return { family, role, people: people.results, relationships: relationships.results, generations: generations.results, announcements: announcements.results, media: media.results, claims: claims.results, members: members.results };

@@ -1,7 +1,9 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import './auth.css';
 
+type User = { id:string; username:string; email:string; phone:string; nickname:string; avatar:string; status:string };
 type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
 type Family = { id:string; name:string; description?:string; join_code:string; source_type:'DATABASE'|'LEGACY_STATIC'; role:Role };
 type Person = { id:string; name:string; gender?:string; generation:number; birth_year?:string; biography?:string; linked_user_id?:string|null };
@@ -24,6 +26,8 @@ export default function FamilyPortal() {
   const [families,setFamilies] = useState<Family[]>([]);
   const [currentId,setCurrentId] = useState('family-lingshi-existing');
   const [showFamilies,setShowFamilies] = useState(false);
+  const [user,setUser] = useState<User|null>(null);
+  const [authLoading,setAuthLoading] = useState(true);
   const [tree,setTree] = useState<Tree|null>(null);
   const [loading,setLoading] = useState(true);
   const [message,setMessage] = useState('');
@@ -33,6 +37,7 @@ export default function FamilyPortal() {
   const current = families.find((family) => family.id === currentId) ?? families[0];
 
   const loadFamilies = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const data = await requestJson<{user:unknown;families:Family[]}>('/api/families');
@@ -41,7 +46,16 @@ export default function FamilyPortal() {
     } catch (error) { setMessage((error as Error).message); }
     finally { setLoading(false); }
   };
-  useEffect(() => { void loadFamilies(); }, []);
+  useEffect(() => {
+    requestJson<{user:User}>('/api/auth/session')
+      .then((data)=>setUser(data.user))
+      .catch(()=>setUser(null))
+      .finally(()=>{setAuthLoading(false);setLoading(false)});
+  }, []);
+  useEffect(() => {
+    if (user) void loadFamilies();
+    else setFamilies([]);
+  }, [user?.id]);
   useEffect(() => {
     if (!current || current.source_type === 'LEGACY_STATIC') { setTree(null); return; }
     setLoading(true);
@@ -94,8 +108,16 @@ export default function FamilyPortal() {
     catch (error) { setMessage((error as Error).message); }
   };
 
+  const logout = async () => {
+    try { await requestJson('/api/auth/logout',{method:'POST'}); }
+    finally { setUser(null); setTree(null); setShowFamilies(false); setMessage('已安全退出登录。'); }
+  };
+
+  if (authLoading) return <main className="portal"><div className="loading">正在检查登录状态…</div></main>;
+  if (!user) return <AuthScreen onAuthenticated={setUser} />;
+
   return <main className="portal">
-    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button></header>
+    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span><button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
     {message && <div className="toast" onClick={() => setMessage('')}>{message}<span>×</span></div>}
     {loading && <div className="loading">正在读取族谱…</div>}
     {current?.source_type === 'LEGACY_STATIC' && <iframe title="凌氏家谱" src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}
@@ -107,6 +129,38 @@ export default function FamilyPortal() {
     </section></div>}
     {addTarget && <div className="veil"><form className="person-dialog" onSubmit={addPerson}><button type="button" className="close" onClick={() => setAddTarget(null)}>×</button><h2>{directions[addTarget.direction]}</h2>{addTarget.reference && <p>以 <strong>{addTarget.reference.name}</strong> 为参照添加</p>}<label>姓名<input name="name" required autoFocus /></label><label>性别<input name="gender" placeholder="可自由填写" /></label><label>出生年份<input name="birthYear" inputMode="numeric" /></label><label>人物生平<textarea name="biography" rows={4}/></label><button className="submit">保存人物</button></form></div>}
   </main>;
+}
+
+function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
+  const [mode,setMode] = useState<'login'|'register'>('login');
+  const [error,setError] = useState('');
+  const [submitting,setSubmitting] = useState(false);
+  const submit = async (event:FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError(''); setSubmitting(true);
+    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+    try {
+      const data = await requestJson<{user:User}>(`/api/auth/${mode}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(values)});
+      onAuthenticated(data.user);
+    } catch (submitError) { setError((submitError as Error).message); }
+    finally { setSubmitting(false); }
+  };
+  return <main className="auth-page"><section className="auth-card">
+    <div className="auth-mark">凌</div><p className="auth-eyebrow">凌氏家谱</p><h1>{mode==='login'?'登录族谱':'创建族谱账号'}</h1>
+    <p className="auth-intro">账号只用于登录。真实姓名、世代和亲属资料请在进入族谱后另行填写。</p>
+    <div className="auth-tabs"><button className={mode==='login'?'active':''} onClick={()=>{setMode('login');setError('')}}>登录</button><button className={mode==='register'?'active':''} onClick={()=>{setMode('register');setError('')}}>注册</button></div>
+    <form className="auth-form" onSubmit={submit}>
+      <label>用户名<input name="username" required minLength={3} maxLength={32} autoComplete="username" placeholder="3—32个字符" /></label>
+      <label>密码<input name="password" required minLength={8} maxLength={128} type="password" autoComplete={mode==='login'?'current-password':'new-password'} placeholder="至少8个字符" /></label>
+      {mode==='register'&&<>
+        <label>确认密码<input name="confirmPassword" required minLength={8} maxLength={128} type="password" autoComplete="new-password" /></label>
+        <div className="auth-two-columns"><label>邮箱<input name="email" type="email" autoComplete="email" placeholder="邮箱或手机号至少填一项" /></label><label>手机号<input name="phone" type="tel" autoComplete="tel" placeholder="邮箱或手机号至少填一项" /></label></div>
+        <label>昵称（选填）<input name="nickname" maxLength={50} autoComplete="nickname" placeholder="进入族谱后显示的名称" /></label>
+      </>}
+      {error&&<p className="auth-error" role="alert">{error}</p>}
+      <button className="auth-submit" disabled={submitting}>{submitting?'请稍候…':mode==='login'?'登录':'注册并登录'}</button>
+    </form>
+    <small className="auth-note">密码经过加盐哈希后保存，网站不会存储明文密码。</small>
+  </section></main>;
 }
 
 function DatabaseTree({tree,onAdd,onClaim,onManage}:{tree:Tree|null;onAdd:(target:{direction:keyof typeof directions;reference?:Person})=>void;onClaim:(id:string)=>void;onManage:(body:Record<string,unknown>)=>void}) {

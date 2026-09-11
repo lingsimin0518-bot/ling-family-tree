@@ -1,0 +1,21 @@
+.account-actions{display:flex;align-items:center;gap:9px}
+.account-actions>span{font-size:14px}
+.plain-button{border:1px solid #efd39a66;background:transparent;color:#fff8e8;border-radius:9px;padding:8px 12px;cursor:pointer}
+.auth-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 10%,#fffaf0 0,#f5ead7 55%,#ead7b9 100%);color:#38251c}
+.auth-card{width:min(610px,100%);background:#fffaf2;border:2px solid #c99a50;border-radius:24px;padding:clamp(24px,5vw,46px);box-shadow:0 25px 70px #5b321b2b}
+.auth-mark{width:72px;height:72px;border:4px double #9b2d28;border-radius:50%;display:grid;place-items:center;margin:auto;color:#8e2925;font:700 34px serif}
+.auth-eyebrow{text-align:center;color:#a06e28;letter-spacing:.18em;margin:12px 0 3px}
+.auth-card h1{text-align:center;font:700 clamp(30px,5vw,42px) serif;color:#7e2622;margin:0}
+.auth-intro{text-align:center;line-height:1.7;color:#766053;margin:10px auto 20px;max-width:470px}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid #d6b47d;border-radius:11px;padding:4px;background:#f7ecd9}
+.auth-tabs button{border:0;border-radius:8px;padding:10px;background:transparent;color:#6e5141;font:700 16px inherit;cursor:pointer}
+.auth-tabs button.active{background:#922d28;color:white;box-shadow:0 3px 10px #641c1933}
+.auth-form{display:grid;gap:13px;margin-top:18px}
+.auth-form label{color:#63352e;font-weight:700}
+.auth-form input{display:block;width:100%;margin-top:6px;border:1px solid #cda66f;background:white;border-radius:9px;padding:11px 12px;font:inherit;color:#38251c}
+.auth-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.auth-submit{border:0;border-radius:10px;padding:12px;background:#922d28;color:white;font:700 17px inherit;cursor:pointer}
+.auth-submit:disabled{opacity:.6;cursor:wait}
+.auth-error{margin:0;border-left:4px solid #ad2c27;background:#fff0ec;color:#8e201b;padding:9px 11px}
+.auth-note{display:block;text-align:center;color:#887166;margin-top:15px;line-height:1.5}
+@media(max-width:650px){.account-actions>span{display:none}.plain-button{padding:8px}.auth-two-columns{grid-template-columns:1fr}.auth-card{padding:24px 18px}}

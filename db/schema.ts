@@ -1,6 +1,33 @@
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
-export const users = sqliteTable('users', { id:text('id').primaryKey(), email:text('email'), displayName:text('display_name'), createdAt:text('created_at').notNull() });
+export const users = sqliteTable('users', {
+  id:text('id').primaryKey(),
+  username:text('username'),
+  passwordHash:text('password_hash'),
+  email:text('email'),
+  phone:text('phone'),
+  nickname:text('nickname'),
+  avatar:text('avatar'),
+  status:text('status').notNull().default('ACTIVE'),
+  displayName:text('display_name'),
+  createdAt:text('created_at').notNull(),
+  updatedAt:text('updated_at'),
+}, t=>[
+  uniqueIndex('idx_users_username_unique').on(t.username),
+  uniqueIndex('idx_users_email_unique').on(t.email),
+  uniqueIndex('idx_users_phone_unique').on(t.phone),
+]);
+export const userSessions = sqliteTable('user_sessions', {
+  id:text('id').primaryKey(),
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  expiresAt:text('expires_at').notNull(),
+  createdAt:text('created_at').notNull(),
+  lastSeenAt:text('last_seen_at').notNull(),
+  userAgent:text('user_agent'),
+}, t=>[
+  index('idx_user_sessions_user').on(t.userId),
+  index('idx_user_sessions_expires').on(t.expiresAt),
+]);
 export const families = sqliteTable('families', { id:text('id').primaryKey(), name:text('name').notNull(), description:text('description'), joinCode:text('join_code').notNull(), sourceType:text('source_type',{enum:['DATABASE','LEGACY_STATIC']}).notNull().default('DATABASE'), createdBy:text('created_by').notNull(), createdAt:text('created_at').notNull() }, t=>[uniqueIndex('idx_families_join_code').on(t.joinCode)]);
 export const familyUsers = sqliteTable('family_users', { userId:text('user_id').notNull().references(()=>users.id), familyId:text('family_id').notNull().references(()=>families.id,{onDelete:'cascade'}), role:text('role',{enum:['OWNER','ADMIN','EDITOR','VIEWER']}).notNull(), joinedAt:text('joined_at').notNull() }, t=>[primaryKey({columns:[t.userId,t.familyId]}),index('idx_family_users_family_role').on(t.familyId,t.role)]);
 export const generations = sqliteTable('generations', { id:text('id').primaryKey(), familyId:text('family_id').notNull().references(()=>families.id,{onDelete:'cascade'}), number:integer('number').notNull(), title:text('title') }, t=>[uniqueIndex('idx_generations_family_number').on(t.familyId,t.number)]);
