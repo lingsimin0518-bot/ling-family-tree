@@ -7,7 +7,8 @@ export async function POST(request: Request) {
     return Response.json({user:result.user},{status:201,headers:{'Set-Cookie':result.cookie,'Cache-Control':'no-store'}});
   } catch (error) {
     if (error instanceof Response) return Response.json({error:await error.text()},{status:error.status});
+    if (error instanceof SyntaxError) return Response.json({error:'注册信息格式不正确'},{status:400});
     console.error(error);
-    return Response.json({error:'注册失败，请稍后重试'},{status:500});
+    return Response.json({error:'账号创建失败，请稍后重试'},{status:500});
   }
 }

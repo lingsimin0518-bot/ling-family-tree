@@ -12,6 +12,7 @@
 .auth-form{display:grid;gap:13px;margin-top:18px}
 .auth-form label{color:#63352e;font-weight:700}
 .auth-form input{display:block;width:100%;margin-top:6px;border:1px solid #cda66f;background:white;border-radius:9px;padding:11px 12px;font:inherit;color:#38251c}
+.auth-form label small{display:block;margin-top:5px;color:#887166;font-size:13px;font-weight:400;line-height:1.45}
 .auth-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .auth-submit{border:0;border-radius:10px;padding:12px;background:#922d28;color:white;font:700 17px inherit;cursor:pointer}
 .auth-submit:disabled{opacity:.6;cursor:wait}

@@ -6,8 +6,11 @@ export const users = sqliteTable('users', {
   passwordHash:text('password_hash'),
   email:text('email'),
   phone:text('phone'),
+  phoneVerifiedAt:text('phone_verified_at'),
   nickname:text('nickname'),
   avatar:text('avatar'),
+  wechatOpenid:text('wechat_openid'),
+  wechatUnionid:text('wechat_unionid'),
   status:text('status').notNull().default('ACTIVE'),
   displayName:text('display_name'),
   createdAt:text('created_at').notNull(),
@@ -16,6 +19,8 @@ export const users = sqliteTable('users', {
   uniqueIndex('idx_users_username_unique').on(t.username),
   uniqueIndex('idx_users_email_unique').on(t.email),
   uniqueIndex('idx_users_phone_unique').on(t.phone),
+  uniqueIndex('idx_users_wechat_openid_unique').on(t.wechatOpenid),
+  uniqueIndex('idx_users_wechat_unionid_unique').on(t.wechatUnionid),
 ]);
 export const userSessions = sqliteTable('user_sessions', {
   id:text('id').primaryKey(),

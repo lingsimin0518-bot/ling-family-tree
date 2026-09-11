@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     return Response.json({user:result.user},{headers:{'Set-Cookie':result.cookie,'Cache-Control':'no-store'}});
   } catch (error) {
     if (error instanceof Response) return Response.json({error:await error.text()},{status:error.status});
+    if (error instanceof SyntaxError) return Response.json({error:'登录信息格式不正确'},{status:400});
     console.error(error);
     return Response.json({error:'登录失败，请稍后重试'},{status:500});
   }

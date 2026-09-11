@@ -103,17 +103,24 @@ function validateRegistration(input: Record<string,unknown>) {
   const password = String(input.password ?? '');
   const confirmPassword = String(input.confirmPassword ?? '');
   const email = normalizeEmail(input.email);
-  const phone = normalizePhone(input.phone);
-  const nickname = String(input.nickname ?? '').trim();
-  if (username.length < 3 || username.length > 32) throw new Response('用户名长度需要为3至32个字符', {status:400});
-  if (!/^[\p{L}\p{N}_-]+$/u.test(username)) throw new Response('用户名只能包含文字、数字、下划线或短横线', {status:400});
+  const rawPhone = String(input.phone ?? '').trim();
+  const phone = normalizePhone(rawPhone);
+  if (username.length < 1 || username.length > 32) throw new Response('用户名长度需要为1至32个字符', {status:400});
+  if (!/^[\p{L}\p{N}_]+$/u.test(username)) throw new Response('用户名只能包含中文、字母、数字或下划线', {status:400});
   if (password.length < 8 || password.length > 128) throw new Response('密码长度需要为8至128个字符', {status:400});
   if (password !== confirmPassword) throw new Response('两次输入的密码不一致', {status:400});
-  if (!email && !phone) throw new Response('邮箱或手机号至少填写一种', {status:400});
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Response('邮箱格式不正确', {status:400});
-  if (phone && !/^\+?\d{6,20}$/.test(phone)) throw new Response('手机号格式不正确', {status:400});
-  if (nickname.length > 50) throw new Response('昵称不能超过50个字符', {status:400});
-  return {username,password,email,phone,nickname:nickname || username};
+  if (rawPhone && (!/^\+?[0-9][0-9\s()-]{5,24}$/.test(rawPhone) || !/^\+?\d{6,20}$/.test(phone))) throw new Response('手机号格式不正确', {status:400});
+  if (!email && !phone) throw new Response('邮箱或手机号至少填写一种', {status:400});
+  return {username,password,email,phone,nickname:username};
+}
+
+function registrationConflictMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/users\.username|idx_users_username_unique/i.test(message)) return '该用户名已被使用';
+  if (/users\.email|idx_users_email_unique/i.test(message)) return '该邮箱已被注册';
+  if (/users\.phone|idx_users_phone_unique/i.test(message)) return '该手机号已被注册';
+  return '';
 }
 
 async function createSession(userId: string, request: Request) {
@@ -154,7 +161,9 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
     }
   } catch (error) {
     console.error('registration insert failed', error);
-    throw new Response('用户名、邮箱或手机号已被注册', {status:409});
+    const conflict = registrationConflictMessage(error);
+    if (conflict) throw new Response(conflict, {status:409});
+    throw new Response('账号创建失败，请稍后重试', {status:500});
   }
   const row = await binding.prepare('SELECT id,username,email,phone,nickname,avatar,status,display_name FROM users WHERE id=?').bind(id).first<Record<string,unknown>>();
   if (!row) throw new Error('注册完成后无法读取账号');
