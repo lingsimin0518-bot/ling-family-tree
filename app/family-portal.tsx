@@ -57,7 +57,7 @@ export default function FamilyPortal() {
     else setFamilies([]);
   }, [user?.id]);
   useEffect(() => {
-    if (!current || current.source_type === 'LEGACY_STATIC') { setTree(null); return; }
+    if (!current) { setTree(null); return; }
     setLoading(true);
     requestJson<Tree>(`/api/families?family_id=${encodeURIComponent(current.id)}`)
       .then(setTree).catch((error) => setMessage(error.message)).finally(() => setLoading(false));
@@ -120,8 +120,7 @@ export default function FamilyPortal() {
     <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span>{user.systemRole==='SUPER_ADMIN'&&<a className="plain-button" href="/admin">系统后台</a>}<button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
     {message && <div className="toast" onClick={() => setMessage('')}>{message}<span>×</span></div>}
     {loading && <div className="loading">正在读取族谱…</div>}
-    {current?.source_type === 'LEGACY_STATIC' && <iframe title={current.name} src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}
-    {current?.source_type === 'DATABASE' && <DatabaseTree tree={tree} onAdd={setAddTarget} onClaim={claim} onManage={manage} />}
+    {current && <iframe title={current.name} src={`/family.html?family_id=${encodeURIComponent(current.id)}`} className="legacy-frame" />}
     {showFamilies && <div className="veil"><section className="family-dialog"><button className="close" onClick={() => setShowFamilies(false)}>×</button><h2>我的族谱</h2><p>一个账号可以加入多本族谱，切换后所有人物与资料互不混用。</p>
       <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><div className="family-row-actions"><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button>{family.role==='OWNER'&&family.source_type!=='LEGACY_STATIC'&&<button className="danger-link" onClick={()=>{setDeleteTarget(family);setDeleteName('')}}>删除</button>}</div></article>)}</div>
       <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button>创建族谱</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>

@@ -1280,8 +1280,115 @@ window.installFamilyFeatures = function (api) {
 
 </script>
 <script>
-(function () {
-  const data = window.NORMALIZED_FAMILY_TREE;
+async function loadCurrentFamilyTree() {
+  const requestedFamilyId = new URLSearchParams(location.search).get('family_id') || 'family-lingshi-existing';
+  try {
+    const response = await fetch(`/api/families?family_id=${encodeURIComponent(requestedFamilyId)}`, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`读取族谱失败（${response.status}）`);
+    const payload = await response.json();
+    const family = payload.family || {};
+    document.title = `${family.name || '家谱'} · 家谱`;
+    const pageHeading = document.querySelector('.app-header h1');
+    if (pageHeading) pageHeading.textContent = family.name || '家谱';
+    const accountLabel = document.querySelector('#accountLabel');
+    if (accountLabel) accountLabel.textContent = `${payload.role || 'VIEWER'} · 已登录`;
+    const loginButton = document.querySelector('#loginButton');
+    if (loginButton) loginButton.hidden = true;
+
+    if (family.source_type === 'LEGACY_STATIC' && !(payload.people || []).length) {
+      window.NORMALIZED_FAMILY_TREE.familyId = requestedFamilyId;
+      window.NORMALIZED_FAMILY_TREE.family = family;
+      window.NORMALIZED_FAMILY_TREE.role = payload.role;
+      return window.NORMALIZED_FAMILY_TREE;
+    }
+
+    const people = (payload.people || []).map(person => ({
+      id: person.id,
+      familyId: person.family_id,
+      name: person.name,
+      gender: person.gender || '待核实',
+      generation: Number(person.generation) || 1,
+      lineage: 'ling',
+      synthetic: false,
+      birthYear: person.birth_year || '未记录',
+      occupation: '未记录',
+      biography: person.biography || '生平资料暂未收集。',
+      fatherId: null,
+      motherId: null,
+      linkedUserId: person.linked_user_id || null
+    }));
+    const peopleById = new Map(people.map(person => [person.id, person]));
+    const spousePairs = [];
+    const parentsByChild = new Map();
+    (payload.relationships || []).forEach(relation => {
+      if (relation.type === 'PARENT') {
+        const parents = parentsByChild.get(relation.to_person_id) || [];
+        parents.push(relation.from_person_id);
+        parentsByChild.set(relation.to_person_id, parents);
+        const parent = peopleById.get(relation.from_person_id);
+        const child = peopleById.get(relation.to_person_id);
+        if (parent && child) {
+          if (parent.gender === '女') child.motherId = parent.id;
+          else if (!child.fatherId) child.fatherId = parent.id;
+          else child.motherId = parent.id;
+        }
+      }
+      if (relation.type === 'SPOUSE') {
+        const pair = [relation.from_person_id, relation.to_person_id].sort();
+        if (!spousePairs.some(item => item[0] === pair[0] && item[1] === pair[1])) spousePairs.push(pair);
+      }
+    });
+    const unions = [];
+    const representedParents = new Set();
+    spousePairs.forEach((pair, index) => {
+      const first = peopleById.get(pair[0]);
+      const second = peopleById.get(pair[1]);
+      if (first && second) {
+        if (parentsByChild.has(first.id) && !parentsByChild.has(second.id)) second.lineage = 'external';
+        else if (!parentsByChild.has(first.id) && parentsByChild.has(second.id)) first.lineage = 'external';
+        else second.lineage = 'external';
+      }
+      const childrenIds = [...parentsByChild.entries()].filter(([, parents]) => parents.some(id => pair.includes(id))).map(([childId]) => childId);
+      unions.push({ id:`union-${index + 1}`, familyId:requestedFamilyId, partnerAId:pair[0], partnerBId:pair[1], childrenIds:[...new Set(childrenIds)] });
+      pair.forEach(id => representedParents.add(id));
+    });
+    [...parentsByChild.entries()].forEach(([childId, parentIds]) => {
+      const parents = [...new Set(parentIds)].filter(id => peopleById.has(id));
+      if (!parents.length || parents.some(id => representedParents.has(id))) return;
+      let partnerAId = parents[0];
+      let partnerBId = parents[1];
+      if (!partnerBId) {
+        partnerBId = `unrecorded-spouse-${partnerAId}`;
+        const parent = peopleById.get(partnerAId);
+        const placeholder = { id:partnerBId, familyId:requestedFamilyId, name:'配偶（未录）', gender:parent?.gender === '男' ? '女' : parent?.gender === '女' ? '男' : '待核实', generation:parent?.generation || 1, lineage:'external', synthetic:false, birthYear:'未记录', occupation:'未记录', biography:'尚未录入配偶资料。', fatherId:null, motherId:null };
+        people.push(placeholder); peopleById.set(partnerBId, placeholder);
+      }
+      const matchingChildren = [...parentsByChild.entries()].filter(([, ids]) => ids.includes(partnerAId)).map(([id]) => id);
+      unions.push({ id:`union-single-${unions.length + 1}`, familyId:requestedFamilyId, partnerAId, partnerBId, childrenIds:[...new Set(matchingChildren)] });
+      representedParents.add(partnerAId);
+    });
+    window.NORMALIZED_FAMILY_TREE = {
+      familyId: requestedFamilyId,
+      family,
+      role: payload.role,
+      people,
+      unions,
+      metadata: {
+        familyId: requestedFamilyId,
+        maxGeneration: Math.max(0, ...people.map(person => person.generation)),
+        firstGenerationFamilies: unions.filter(union => peopleById.get(union.partnerAId)?.generation === 1).length
+      }
+    };
+    return window.NORMALIZED_FAMILY_TREE;
+  } catch (error) {
+    const status = document.querySelector('#searchStatus');
+    if (status) status.textContent = error instanceof Error ? error.message : '暂时无法读取当前族谱';
+    return window.NORMALIZED_FAMILY_TREE;
+  }
+}
+
+(async function () {
+  const data = await loadCurrentFamilyTree();
   const peopleById = new Map(data.people.map((person) => [person.id, person]));
   const unionByPersonId = new Map();
   data.unions.forEach((union) => {
@@ -1473,13 +1580,22 @@ window.installFamilyFeatures = function (api) {
     tree.style.removeProperty("width");
     tree.replaceChildren();
     tree.classList.add("normalized-tree");
+    if (!data.people.length) {
+      const empty = document.createElement('section');
+      empty.className = 'empty-state';
+      empty.innerHTML = `<h2>${escapeHtml(data.family?.name || '当前族谱')}</h2><p>这是一本文字资料尚未录入的空白族谱。第一位人物只是初始人物，不会自动标记为始祖。</p>`;
+      tree.appendChild(empty);
+      stats.textContent = '0 位人物 · 0 代 · 0 个第一代家庭';
+      renderGenerationExplorer();
+      return;
+    }
     const childIds = new Set(data.unions.flatMap((union) => union.childrenIds));
     const roots = data.people.filter((person) => person.generation === 1 && person.lineage === "ling" && !childIds.has(person.id));
     roots.forEach((root, index) => {
       const section = document.createElement("section");
       section.className = "root-family";
       const heading = document.createElement("h2");
-      heading.textContent = index === 0 ? "第一代 · 已有主支" : `第一代 · 新增测试支系 ${index}`;
+      heading.textContent = index === 0 ? "第一代 · 已有主支" : `第一代 · 第 ${index + 1} 支`;
       section.appendChild(heading);
       section.appendChild(renderFamily(root.id));
       tree.appendChild(section);
@@ -1514,7 +1630,7 @@ window.installFamilyFeatures = function (api) {
       if (people.length > 18) names.insertAdjacentHTML("beforeend", `<span>另有 ${people.length - 18} 位…</span>`);
       content.appendChild(names);
       if (generation === 5) content.insertAdjacentHTML("beforeend", '<div class="generation-end">五代同谱边界 · 第六代起属于延续支系</div>');
-      if (generation === data.metadata.maxGeneration) content.insertAdjacentHTML("beforeend", '<div class="generation-end">当前测试资料记录至第八代</div>');
+      if (generation === data.metadata.maxGeneration) content.insertAdjacentHTML("beforeend", `<div class="generation-end">当前资料记录至第${generation}代</div>`);
       details.appendChild(content);
       generationExplorer.appendChild(details);
     }
