@@ -13,6 +13,7 @@ export type AuthUser = {
   nickname: string;
   avatar: string;
   status: string;
+  systemRole: 'USER' | 'SUPER_ADMIN';
 };
 
 function db() {
@@ -84,6 +85,7 @@ function publicUser(row: Record<string, unknown>): AuthUser {
     nickname:String(row.nickname ?? row.display_name ?? row.username ?? '族人'),
     avatar:String(row.avatar ?? ''),
     status:String(row.status ?? 'ACTIVE'),
+    systemRole:String(row.system_role ?? 'USER') === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'USER',
   };
 }
 
@@ -165,7 +167,7 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
     if (conflict) throw new Response(conflict, {status:409});
     throw new Response('账号创建失败，请稍后重试', {status:500});
   }
-  const row = await binding.prepare('SELECT id,username,email,phone,nickname,avatar,status,display_name FROM users WHERE id=?').bind(id).first<Record<string,unknown>>();
+  const row = await binding.prepare('SELECT id,username,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE id=?').bind(id).first<Record<string,unknown>>();
   if (!row) throw new Error('注册完成后无法读取账号');
   return {user:publicUser(row),cookie:await createSession(id,request)};
 }
@@ -174,10 +176,12 @@ export async function loginUser(input: Record<string,unknown>, request: Request)
   const username = String(input.username ?? '').trim();
   const password = String(input.password ?? '');
   if (!username || !password) throw new Response('请输入用户名和密码', {status:400});
-  const row = await db().prepare('SELECT id,username,password_hash,email,phone,nickname,avatar,status,display_name FROM users WHERE username=? COLLATE NOCASE')
+  const row = await db().prepare('SELECT id,username,password_hash,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE username=? COLLATE NOCASE')
     .bind(username).first<Record<string,unknown>>();
   if (!row || !row.password_hash || !(await verifyPassword(password,String(row.password_hash)))) throw new Response('用户名或密码不正确', {status:401});
   if (String(row.status ?? 'ACTIVE') !== 'ACTIVE') throw new Response('该账号当前不可登录，请联系管理员', {status:403});
+  const loginTime = new Date().toISOString();
+  await db().prepare('UPDATE users SET last_login_at=?,updated_at=? WHERE id=?').bind(loginTime,loginTime,String(row.id)).run();
   return {user:publicUser(row),cookie:await createSession(String(row.id),request)};
 }
 
@@ -186,7 +190,7 @@ export async function getSessionUser(request: Request) {
   if (!token) return null;
   const id = await sha256(token);
   const now = new Date().toISOString();
-  const row = await db().prepare(`SELECT u.id,u.username,u.email,u.phone,u.nickname,u.avatar,u.status,u.display_name
+  const row = await db().prepare(`SELECT u.id,u.username,u.email,u.phone,u.nickname,u.avatar,u.status,u.system_role,u.display_name
     FROM user_sessions s JOIN users u ON u.id=s.user_id
     WHERE s.id=? AND s.expires_at>? AND u.status='ACTIVE'`).bind(id,now).first<Record<string,unknown>>();
   if (!row) return null;
@@ -197,6 +201,12 @@ export async function getSessionUser(request: Request) {
 export async function requireUser(request: Request) {
   const user = await getSessionUser(request);
   if (!user) throw new Response('请先登录后使用族谱管理功能', {status:401});
+  return user;
+}
+
+export async function requireSuperAdmin(request: Request) {
+  const user = await requireUser(request);
+  if (user.systemRole !== 'SUPER_ADMIN') throw new Response('无权访问系统后台', {status:403});
   return user;
 }
 

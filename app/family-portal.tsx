@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import './auth.css';
 
-type User = { id:string; username:string; email:string; phone:string; nickname:string; avatar:string; status:string };
+type User = { id:string; username:string; email:string; phone:string; nickname:string; avatar:string; status:string; systemRole:'USER'|'SUPER_ADMIN' };
 type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
 type Family = { id:string; name:string; description?:string; join_code:string; source_type:'DATABASE'|'LEGACY_STATIC'; role:Role };
 type Person = { id:string; name:string; gender?:string; generation:number; birth_year?:string; biography?:string; linked_user_id?:string|null };
@@ -117,7 +117,7 @@ export default function FamilyPortal() {
   if (!user) return <AuthScreen onAuthenticated={setUser} />;
 
   return <main className="portal">
-    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span><button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
+    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '加载中…'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span>{user.systemRole==='SUPER_ADMIN'&&<a className="plain-button" href="/admin">系统后台</a>}<button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
     {message && <div className="toast" onClick={() => setMessage('')}>{message}<span>×</span></div>}
     {loading && <div className="loading">正在读取族谱…</div>}
     {current?.source_type === 'LEGACY_STATIC' && <iframe title={current.name} src={`/family.html?family_id=${current.id}`} className="legacy-frame" />}

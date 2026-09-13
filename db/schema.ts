@@ -12,6 +12,10 @@ export const users = sqliteTable('users', {
   wechatOpenid:text('wechat_openid'),
   wechatUnionid:text('wechat_unionid'),
   status:text('status').notNull().default('ACTIVE'),
+  systemRole:text('system_role',{enum:['USER','SUPER_ADMIN']}).notNull().default('USER'),
+  lastLoginAt:text('last_login_at'),
+  disabledAt:text('disabled_at'),
+  disabledBy:text('disabled_by'),
   displayName:text('display_name'),
   createdAt:text('created_at').notNull(),
   updatedAt:text('updated_at'),
@@ -21,6 +25,19 @@ export const users = sqliteTable('users', {
   uniqueIndex('idx_users_phone_unique').on(t.phone),
   uniqueIndex('idx_users_wechat_openid_unique').on(t.wechatOpenid),
   uniqueIndex('idx_users_wechat_unionid_unique').on(t.wechatUnionid),
+]);
+export const systemAuditLogs = sqliteTable('system_audit_logs', {
+  id:text('id').primaryKey(),
+  operatorUserId:text('operator_user_id').notNull().references(()=>users.id),
+  actionType:text('action_type').notNull(),
+  targetUserId:text('target_user_id').references(()=>users.id),
+  oldValue:text('old_value'),
+  newValue:text('new_value'),
+  createdAt:text('created_at').notNull(),
+  reason:text('reason'),
+}, t=>[
+  index('idx_system_audit_logs_created').on(t.createdAt),
+  index('idx_system_audit_logs_target').on(t.targetUserId),
 ]);
 export const userSessions = sqliteTable('user_sessions', {
   id:text('id').primaryKey(),
