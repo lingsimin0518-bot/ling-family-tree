@@ -135,6 +135,8 @@ function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
   const [mode,setMode] = useState<'login'|'register'>('login');
   const [error,setError] = useState('');
   const [submitting,setSubmitting] = useState(false);
+  const [showPassword,setShowPassword] = useState(false);
+  const [showConfirmPassword,setShowConfirmPassword] = useState(false);
   const submit = async (event:FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(''); setSubmitting(true);
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -147,12 +149,12 @@ function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
   return <main className="auth-page"><section className="auth-card">
     <p className="auth-eyebrow">记录家族 · 传承记忆</p><h1>家谱</h1>
     <p className="auth-intro">{mode==='login'?'登录后查看和管理您已加入的族谱。':'注册只创建登录账号，真实姓名、世代和亲属资料请在进入族谱后另行填写。'}</p>
-    <div className="auth-tabs"><button className={mode==='login'?'active':''} onClick={()=>{setMode('login');setError('')}}>登录</button><button className={mode==='register'?'active':''} onClick={()=>{setMode('register');setError('')}}>注册</button></div>
+    <div className="auth-tabs"><button className={mode==='login'?'active':''} onClick={()=>{setMode('login');setError('');setShowPassword(false);setShowConfirmPassword(false)}}>登录</button><button className={mode==='register'?'active':''} onClick={()=>{setMode('register');setError('');setShowPassword(false);setShowConfirmPassword(false)}}>注册</button></div>
     <form className="auth-form" onSubmit={submit}>
       <label>用户名<input name="username" required minLength={1} maxLength={32} autoComplete="username" placeholder="1—32个中文、字母、数字或下划线" />{mode==='register'&&<small>用户名仅用于登录，不等同于真实姓名。</small>}</label>
-      <label>密码<input name="password" required minLength={8} maxLength={128} type="password" autoComplete={mode==='login'?'current-password':'new-password'} placeholder="至少8个字符" /></label>
+      <label><span>密码</span><div className="password-control"><input name="password" required minLength={8} maxLength={128} type={showPassword?'text':'password'} autoComplete={mode==='login'?'current-password':'new-password'} placeholder="至少8个字符" /><button type="button" className="password-toggle" aria-pressed={showPassword} onClick={()=>setShowPassword((visible)=>!visible)}>{showPassword?'隐藏':'显示'}</button></div></label>
       {mode==='register'&&<>
-        <label>确认密码<input name="confirmPassword" required minLength={8} maxLength={128} type="password" autoComplete="new-password" /></label>
+        <label><span>确认密码</span><div className="password-control"><input name="confirmPassword" required minLength={8} maxLength={128} type={showConfirmPassword?'text':'password'} autoComplete="new-password" /><button type="button" className="password-toggle" aria-pressed={showConfirmPassword} onClick={()=>setShowConfirmPassword((visible)=>!visible)}>{showConfirmPassword?'隐藏':'显示'}</button></div></label>
         <div className="auth-two-columns"><label>邮箱<input name="email" type="email" autoComplete="email" placeholder="例如 name@example.com" /><small>用于找回账号，可二选一。</small></label><label>手机号<input name="phone" type="tel" autoComplete="tel" placeholder="例如 13800138000" /><small>用于找回账号，可二选一；当前无需验证码。</small></label></div>
       </>}
       {error&&<p className="auth-error" role="alert">{error}</p>}

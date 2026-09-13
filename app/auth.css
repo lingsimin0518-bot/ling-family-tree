@@ -13,6 +13,11 @@
 .auth-form label{color:#63352e;font-weight:700}
 .auth-form input{display:block;width:100%;margin-top:6px;border:1px solid #cda66f;background:white;border-radius:9px;padding:11px 12px;font:inherit;color:#38251c}
 .auth-form label small{display:block;margin-top:5px;color:#887166;font-size:13px;font-weight:400;line-height:1.45}
+.password-control{position:relative;margin-top:6px}
+.password-control input{margin-top:0;padding-right:66px}
+.password-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:0;border-radius:7px;background:#f5e7d1;color:#7e2622;padding:6px 10px;font:700 14px inherit;cursor:pointer}
+.password-toggle:hover{background:#ecd5b2}
+.password-toggle:focus-visible{outline:2px solid #922d28;outline-offset:2px}
 .auth-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .auth-submit{border:0;border-radius:10px;padding:12px;background:#922d28;color:white;font:700 17px inherit;cursor:pointer}
 .auth-submit:disabled{opacity:.6;cursor:wait}
