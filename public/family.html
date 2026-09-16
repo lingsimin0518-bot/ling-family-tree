@@ -508,14 +508,14 @@ dd { margin: 0; }
     </section>
     </div>
     <section class="ebook-library view-panel" data-view-panel="ebook" hidden aria-labelledby="ebookTitle">
-      <div class="ebook-heading"><div><p class="eyebrow">电子族谱</p><h2 id="ebookTitle">凌氏家谱藏书</h2></div><span>共 2 卷 · 试阅版</span></div>
+      <div class="ebook-heading"><div><p class="eyebrow">电子族谱</p><h2 id="ebookTitle" data-family-book-title>族谱藏书</h2></div><span>共 2 卷 · 试阅版</span></div>
       <article class="ebook-card">
-        <div class="book-cover traditional"><span>凌氏家谱</span><small>世系卷</small></div>
-        <div><h3>凌氏家谱 · 世系卷</h3><dl><div><dt>卷号</dt><dd>第一卷</dd></div><div><dt>内容</dt><dd>八代世系与家庭支脉</dd></div><div><dt>编修</dt><dd>凌氏家族理事会（演示）</dd></div></dl><button type="button" data-open-book="lineage">阅读谱书</button></div>
+        <div class="book-cover traditional"><span data-family-name>家谱</span><small>世系卷</small></div>
+        <div><h3 data-family-volume="世系卷">家谱 · 世系卷</h3><dl><div><dt>卷号</dt><dd>第一卷</dd></div><div><dt>内容</dt><dd>八代世系与家庭支脉</dd></div><div><dt>编修</dt><dd data-family-editor>家族理事会（演示）</dd></div></dl><button type="button" data-open-book="lineage">阅读谱书</button></div>
       </article>
       <article class="ebook-card">
-        <div class="book-cover modern"><span>凌氏家谱</span><small>家训行传</small></div>
-        <div><h3>凌氏家谱 · 家训行传</h3><dl><div><dt>卷号</dt><dd>第二卷</dd></div><div><dt>内容</dt><dd>家训、字辈与人物行传</dd></div><div><dt>编修</dt><dd>凌氏家族理事会（演示）</dd></div></dl><button type="button" data-open-book="stories">阅读谱书</button></div>
+        <div class="book-cover modern"><span data-family-name>家谱</span><small>家训行传</small></div>
+        <div><h3 data-family-volume="家训行传">家谱 · 家训行传</h3><dl><div><dt>卷号</dt><dd>第二卷</dd></div><div><dt>内容</dt><dd>家训、字辈与人物行传</dd></div><div><dt>编修</dt><dd data-family-editor>家族理事会（演示）</dd></div></dl><button type="button" data-open-book="stories">阅读谱书</button></div>
       </article>
     </section>
   </main>
@@ -928,6 +928,7 @@ dd { margin: 0; }
 /* Family directory, five-generation tables and member detail workflows. */
 window.installFamilyFeatures = function (api) {
   const { data, peopleById, partnerOf, childrenOf } = api;
+  const familyDisplayName = data.family?.name || '家谱';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const el = (tag, text, cls) => { const node = document.createElement(tag); if (text) node.textContent = text; if (cls) node.className = cls; return node; };
   const button = (text, fn) => { const node = el('button', text); node.type = 'button'; node.addEventListener('click', fn); return node; };
@@ -1048,7 +1049,7 @@ window.installFamilyFeatures = function (api) {
       for (let start = 1; start <= data.metadata.maxGeneration; start += 5) {
         const paths = leaves.map(ancestry).filter(path => path.some(p => p.generation >= start));
         for (let offset = 0; offset < paths.length; offset += 6) {
-          const group = paths.slice(offset, offset + 6); let html = `<section class="ou-page"><h2>凌氏家谱 · 欧式表</h2><p>始祖：${esc(root.name)} · 第${start}—${Math.min(start+4,data.metadata.maxGeneration)}代 · 接续 ${Math.floor(offset/6)+1}</p><table><tbody>`;
+          const group = paths.slice(offset, offset + 6); let html = `<section class="ou-page"><h2>${esc(familyDisplayName)} · 欧式表</h2><p>始祖：${esc(root.name)} · 第${start}—${Math.min(start+4,data.metadata.maxGeneration)}代 · 接续 ${Math.floor(offset/6)+1}</p><table><tbody>`;
           for (let gen = start; gen <= Math.min(start+4,data.metadata.maxGeneration); gen++) { html += `<tr><th scope="row">第${gen}世</th>`; group.forEach(path => { const p = path.find(x => x.generation === gen); const spouse = p && partnerOf(p); html += p ? `<td><button data-table-person="${esc(p.id)}">${esc(p.name)}</button><span>${esc(p.birthYear)}</span><span>配：${esc(spouse?.name || '未记录')}</span><span>${esc(parentText(p).split(' · 编号')[0])}</span></td>` : '<td>—</td>'; }); html += '</tr>'; }
           html += '</tbody></table><p class="ou-note">各列沿父母链向下；共同祖先在不同支系重复列出。测试资料须核实。</p></section>'; result.push(html);
         }
@@ -1062,9 +1063,9 @@ window.installFamilyFeatures = function (api) {
     let pages = [];
     if (kind === 'hierarchy') pages = buildTables();
     if (kind === 'ebook') { pages = api.bookCollections[selectedBook].map(p=>`<section class="print-page"><h1>${esc(p.title)}</h1><p>${esc(p.kicker)}</p><p style="white-space:pre-wrap">${esc(p.body)}</p></section>`); }
-    if (kind === 'tree') { data.unions.filter(u=>u.childrenIds.length).forEach(u=> { const a=peopleById.get(u.partnerAId), b=peopleById.get(u.partnerBId); const card=p=>`<div class="print-person"><b>${esc(p?.name||'未记录')}</b><p>第${p?.generation||'?'}代</p><small>${esc(p?.id||'')}</small></div>`; pages.push(`<section class="print-page"><h2>凌氏家谱 · 家庭树</h2><p>家庭编号 ${esc(u.id)} · 子女按人物编号接续其他页</p><div class="print-couple">${card(a)}<span>夫妻</span>${card(b)}</div><div class="print-children">${u.childrenIds.map(id=>card(peopleById.get(id))).join('')}</div></section>`); }); }
+    if (kind === 'tree') { data.unions.filter(u=>u.childrenIds.length).forEach(u=> { const a=peopleById.get(u.partnerAId), b=peopleById.get(u.partnerBId); const card=p=>`<div class="print-person"><b>${esc(p?.name||'未记录')}</b><p>第${p?.generation||'?'}代</p><small>${esc(p?.id||'')}</small></div>`; pages.push(`<section class="print-page"><h2>${esc(familyDisplayName)} · 家庭树</h2><p>家庭编号 ${esc(u.id)} · 子女按人物编号接续其他页</p><div class="print-couple">${card(a)}<span>夫妻</span>${card(b)}</div><div class="print-children">${u.childrenIds.map(id=>card(peopleById.get(id))).join('')}</div></section>`); }); }
     const css = document.querySelector('style')?.textContent || '';
-    printWindow.document.open();printWindow.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>凌氏家谱-${esc(kind)}</title><style>${css}\nbody{background:white;margin:0;color:black;font:16px 'Microsoft YaHei',serif} .print-page,.ou-page{break-after:page;padding:12mm;box-sizing:border-box;width:100%;background:white} .print-page p{line-height:1.8} .print-couple,.print-children{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.print-children{border-top:2px solid #755a31;margin-top:30px;padding-top:20px}.print-person{border:1px solid #755a31;padding:15px;min-width:100px}.ou-page table{width:100%}.ou-page td{height:36mm} @page{size:A4 landscape;margin:8mm} .print-controls{padding:20px;background:#fff4da}@media print{.print-controls{display:none}button{color:black;background:none;border:0}.ou-page{box-shadow:none;margin:0}}</style></head><body><div class="print-controls">共 ${pages.length} 页。点击打印，在目标打印机中选择“另存为 PDF”。<button onclick="window.print()">打印 / 保存 PDF</button></div>${pages.join('')}</body></html>`);printWindow.document.close();
+    printWindow.document.open();printWindow.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(familyDisplayName)}-${esc(kind)}</title><style>${css}\nbody{background:white;margin:0;color:black;font:16px 'Microsoft YaHei',serif} .print-page,.ou-page{break-after:page;padding:12mm;box-sizing:border-box;width:100%;background:white} .print-page p{line-height:1.8} .print-couple,.print-children{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.print-children{border-top:2px solid #755a31;margin-top:30px;padding-top:20px}.print-person{border:1px solid #755a31;padding:15px;min-width:100px}.ou-page table{width:100%}.ou-page td{height:36mm} @page{size:A4 landscape;margin:8mm} .print-controls{padding:20px;background:#fff4da}@media print{.print-controls{display:none}button{color:black;background:none;border:0}.ou-page{box-shadow:none;margin:0}}</style></head><body><div class="print-controls">共 ${pages.length} 页。点击打印，在目标打印机中选择“另存为 PDF”。<button onclick="window.print()">打印 / 保存 PDF</button></div>${pages.join('')}</body></html>`);printWindow.document.close();
     printWindow.addEventListener('load',()=>printWindow.print(),{once:true});
   }
   ['hierarchy','ebook'].forEach(kind=>{ const bar=el('div','','member-tools export-tools');bar.append(button('导出 PDF',()=>exportPdf(kind)),el('small','打印预览中选择“另存为 PDF”'));document.querySelector(`[data-view-panel="${kind}"]`).prepend(bar); });
@@ -1408,6 +1409,13 @@ async function loadCurrentFamilyTree() {
 
 (async function () {
   const data = await loadCurrentFamilyTree();
+  const familyDisplayName = data.family?.name || '家谱';
+  const familyStem = familyDisplayName.replace(/(?:家谱|族谱)$/, '');
+  document.querySelectorAll('[data-family-name]').forEach((node) => { node.textContent = familyDisplayName; });
+  document.querySelectorAll('[data-family-volume]').forEach((node) => { node.textContent = `${familyDisplayName} · ${node.dataset.familyVolume}`; });
+  document.querySelectorAll('[data-family-editor]').forEach((node) => { node.textContent = `${familyStem || '本'}家族理事会（演示）`; });
+  const familyBookTitle = document.querySelector('[data-family-book-title]');
+  if (familyBookTitle) familyBookTitle.textContent = `${familyDisplayName}藏书`;
   const peopleById = new Map(data.people.map((person) => [person.id, person]));
   const unionByPersonId = new Map();
   data.unions.forEach((union) => {
@@ -1707,13 +1715,13 @@ async function loadCurrentFamilyTree() {
 
   const bookCollections = {
     lineage: [
-      { title: "凌氏家谱 · 世系卷", kicker: "卷首", body: "木有本，水有源。族谱以共同先祖为第一代，逐代记录婚配、子女、迁居与生平。本卷资料处于家族内部整理阶段。" },
+      { title: `${familyDisplayName} · 世系卷`, kicker: "卷首", body: "木有本，水有源。族谱以共同先祖为第一代，逐代记录婚配、子女、迁居与生平。本卷资料处于家族内部整理阶段。" },
       { title: "第一代世系", kicker: "第一章", body: "第一代为各支共同起点。谱图中的夫妻横向并列，子女依出生次序标注长子、次子、长女、次女。" },
       { title: "第二至第五代", kicker: "第二章", body: "各代沿父母家庭向下延伸。第一至第五代保持同谱，第六代起可根据家族实际情况建立分支谱。" },
       { title: "第六至第八代", kicker: "第三章", body: "新增三代目前均为功能演示资料，用于检查分支谱、跨代关系、长幼排行和电子谱书的展示效果，不能作为正式家族史料。" }
     ],
     stories: [
-      { title: "凌氏家训", kicker: "卷首", body: "敬祖睦族，孝亲友爱；诚实守信，勤学立身；珍惜家族记忆，也尊重每位成员的隐私与意愿。" },
+      { title: `${familyStem || '本家'}家训`, kicker: "卷首", body: "敬祖睦族，孝亲友爱；诚实守信，勤学立身；珍惜家族记忆，也尊重每位成员的隐私与意愿。" },
       { title: "字辈记录", kicker: "第一章", body: "现有资料中，第二代使用“玉”字辈，第三代使用“永”字辈。其他字辈仍待长辈核实后正式收入谱书。" },
       { title: "人物行传", kicker: "第二章", body: "人物生平应注明资料来源，经本人或近亲确认，并由管理员审核后收入电子谱书。测试内容不得作为正式史料。" }
     ]
