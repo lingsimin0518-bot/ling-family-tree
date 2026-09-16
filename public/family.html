@@ -143,8 +143,7 @@ main { padding: 1.25rem clamp(1rem, 4vw, 4rem) 3rem; }
 .five-generation-export-dialog dt { color: var(--muted); }
 .five-generation-export-dialog dd { margin: 0; font-weight: 700; }
 .export-warning { padding: .8rem; color: #7a341f; border-left: 4px solid #c46a2b; background: #fff0df; line-height: 1.55; }
-#kinshipDictionaryFields { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; max-height: 55vh; overflow: auto; padding: .25rem; }
-@media (max-width: 640px) { .search-result-item { grid-template-columns: 1fr; } .search-result-actions { grid-template-columns: repeat(2, 1fr); } .tree-tools > button, .tree-tools > label { flex: 1 1 calc(50% - .45rem); } .tree-tools select, .tree-tools button { width: 100%; } .kinship-selection, .kinship-pickers, #kinshipDictionaryFields { grid-template-columns: 1fr; } .kinship-result dl div, .five-generation-export-dialog #fiveGenerationExportSummary dl div { grid-template-columns: 1fr; gap: .1rem; } }
+@media (max-width: 640px) { .search-result-item { grid-template-columns: 1fr; } .search-result-actions { grid-template-columns: repeat(2, 1fr); } .tree-tools > button, .tree-tools > label { flex: 1 1 calc(50% - .45rem); } .tree-tools select, .tree-tools button { width: 100%; } .kinship-selection, .kinship-pickers { grid-template-columns: 1fr; } .kinship-result dl div, .five-generation-export-dialog #fiveGenerationExportSummary dl div { grid-template-columns: 1fr; gap: .1rem; } }
 
 .tree-panel { overflow-x: auto; padding: 1rem 0 2rem; }
 .tree-panel { position: relative; min-height: 28rem; max-height: 76vh; overflow: auto; overscroll-behavior: contain; }
@@ -456,7 +455,6 @@ dd { margin: 0; }
       <button id="addMemberButton" type="button">＋ 添加成员</button>
       <button id="editMemberButton" type="button">编辑最近查看人物</button>
       <button id="reviewButton" type="button" class="admin-button">管理员审核 <span id="reviewCount" class="count-badge">0</span></button>
-      <button id="editKinshipDictionaryButton" type="button" class="admin-button" hidden>维护本家称谓</button>
       <p id="actionStatus" role="status" aria-live="polite"></p>
     </section>
     <nav class="view-switcher" aria-label="族谱浏览方式">
@@ -556,12 +554,6 @@ dd { margin: 0; }
     <div id="fiveGenerationExportSummary"></div>
     <p id="fiveGenerationExportWarning" class="export-warning" hidden>单页缩放后文字可能过小。推荐使用 A4 多页清晰导出，也可以强制单页导出。</p>
     <div class="dialog-actions"><button id="exportFiveMultiPage" type="button">A4 多页清晰导出</button><button id="exportFiveSinglePage" type="button" class="secondary-action">强制单页导出</button></div>
-  </dialog>
-  <dialog id="kinshipDictionaryDialog" class="form-dialog kinship-dictionary-dialog">
-    <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
-    <h2>维护本家称谓</h2>
-    <p class="dialog-intro">只覆盖当前家族的实际称呼；关系计算与标准称谓不会改变。</p>
-    <form id="kinshipDictionaryForm" class="member-form"><div id="kinshipDictionaryFields"></div><button type="submit" class="primary-action">保存本家称谓</button></form>
   </dialog>
   <dialog id="loginDialog" class="form-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
@@ -801,7 +793,6 @@ dd { margin: 0; }
 (function (root) {
   const BROTHERS = new Set(['older_brother', 'younger_brother', 'brother']);
   const SISTERS = new Set(['older_sister', 'younger_sister', 'sister']);
-  const STORAGE_KEY = 'lingshi-family-custom-kinship-v1';
   const BASE = Object.freeze({
     self: { standard: '本人', northeast: '本人', lingyuan: '本人' },
     father: { standard: '父亲', northeast: '爸爸', lingyuan: '爸' },
@@ -889,15 +880,7 @@ dd { margin: 0; }
     return null;
   }
 
-  function loadCustom(storage) {
-    try { return JSON.parse(storage?.getItem(STORAGE_KEY) || '{}') || {}; } catch { return {}; }
-  }
-  function saveCustom(values, storage) {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(values || {}));
-    return values || {};
-  }
-
-  function describe(path, data, options = {}) {
+  function describe(path, data) {
     if (!path) return null;
     const key = relationKey(path.steps);
     const target = data.people.find(person => person.id === path.toId);
@@ -907,19 +890,17 @@ dd { margin: 0; }
     const northeast = configured?.northeast || standard;
     const ranked = configured ? regionalRankedTerm(key, target, data) : null;
     const lingyuan = ranked || configured?.lingyuan || standard;
-    const custom = (options.custom || loadCustom(options.storage || root.localStorage))[key] || '';
-    const primary = custom || lingyuan;
+    const primary = lingyuan;
     const difference = path.generationDifference;
     const generationText = difference === 0 ? '同辈' : difference < 0 ? `上${Math.abs(difference)}辈` : `下${difference}辈`;
-    return { key, chain: generic, standard, northeast, lingyuan, custom, primary, generationDifference: difference, generationText };
+    return { key, chain: generic, standard, northeast, lingyuan, primary, generationDifference: difference, generationText };
   }
 
   const api = Object.freeze({
     STANDARD: Object.freeze(Object.fromEntries(Object.entries(BASE).map(([key, value]) => [key, value.standard]))),
     NORTHEAST: Object.freeze(Object.fromEntries(Object.entries(BASE).map(([key, value]) => [key, value.northeast]))),
     LINGYUAN_CHAOYANG: Object.freeze(Object.fromEntries(Object.entries(BASE).map(([key, value]) => [key, value.lingyuan]))),
-    FAMILY_CUSTOM: STORAGE_KEY,
-    relationKey, rankInfo, describe, loadCustom, saveCustom
+    relationKey, rankInfo, describe
   });
   root.KinshipDictionary = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -1484,8 +1465,6 @@ async function loadCurrentFamilyTree() {
   const fiveGenerationExportDialog = document.querySelector('#fiveGenerationExportDialog');
   const fiveGenerationExportSummary = document.querySelector('#fiveGenerationExportSummary');
   const fiveGenerationExportWarning = document.querySelector('#fiveGenerationExportWarning');
-  const editKinshipDictionaryButton = document.querySelector('#editKinshipDictionaryButton');
-  const kinshipDictionaryDialog = document.querySelector('#kinshipDictionaryDialog');
   let lastViewedPerson = null;
   let currentRole = null;
   let reviewFilter = "all";
@@ -1707,7 +1686,6 @@ async function loadCurrentFamilyTree() {
     accountLabel.textContent = role === "admin" ? "已登录：管理员" : "已登录：普通成员";
     loginButton.textContent = "切换身份";
     reviewButton.hidden = role !== "admin";
-    editKinshipDictionaryButton.hidden = role !== "admin";
     actionStatus.textContent = role === "admin" ? "管理员模式：可以审核注册和资料申请。" : "普通成员模式：可以提交资料，审核中心不可见。";
     loginDialog.close();
     features?.renderCommunity();
@@ -2491,26 +2469,6 @@ async function loadCurrentFamilyTree() {
     document.querySelector('#showFullTreeButton').classList.toggle('active', value === 'all');
     treeToolStatus.textContent = value === 'all' ? '' : `正在查看第${value}代成员。`;
   });
-  function openKinshipDictionary() {
-    if (currentRole !== 'admin') return;
-    const fields = document.querySelector('#kinshipDictionaryFields');
-    const custom = window.KinshipDictionary.loadCustom(localStorage);
-    fields.replaceChildren();
-    Object.entries(window.KinshipDictionary.STANDARD).forEach(([key, standard]) => {
-      if (key.includes('>')) return;
-      const label = document.createElement('label'); label.textContent = `${standard}（${key}）`;
-      const input = document.createElement('input'); input.name = key; input.value = custom[key] || ''; input.placeholder = `默认：${window.KinshipDictionary.LINGYUAN_CHAOYANG[key] || standard}`;
-      label.append(input); fields.append(label);
-    });
-    kinshipDictionaryDialog.showModal();
-  }
-  editKinshipDictionaryButton.addEventListener('click', openKinshipDictionary);
-  document.querySelector('#kinshipDictionaryForm').addEventListener('submit', event => {
-    event.preventDefault(); if (currentRole !== 'admin') return;
-    const values = Object.fromEntries([...new FormData(event.currentTarget).entries()].map(([key, value]) => [key, String(value).trim()]).filter(([, value]) => value));
-    window.KinshipDictionary.saveCustom(values, localStorage);
-    kinshipDictionaryDialog.close(); actionStatus.textContent = '本家称谓字典已保存，仅影响凌源/朝阳优先称谓。';
-  });
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
   features = window.installFamilyFeatures({ data, peopleById, partnerOf, childrenOf, showPerson, openEditDialog, openPersistentAdd, claimPerson:claimDatabasePerson, canEditPerson, canAddPeople, isDatabaseFamily, queueReview, getRole: () => currentRole, login: () => loginDialog.showModal(), bookCollections, renderTree });
@@ -2520,7 +2478,6 @@ async function loadCurrentFamilyTree() {
     accountLabel.textContent = `${data.role} · 已登录`;
     loginButton.hidden = true;
     reviewButton.hidden = !canManageAll;
-    editKinshipDictionaryButton.hidden = !canManageAll;
     actionStatus.textContent = data.role === 'VIEWER' ? '当前为只读权限。' : '人物与关系修改将保存到当前族谱。';
   }
   updateReviewBadge();
