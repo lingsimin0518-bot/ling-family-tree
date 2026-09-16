@@ -477,7 +477,7 @@ dd { margin: 0; }
     <div class="view-panel" data-view-panel="tree">
     <section class="tree-tools" aria-label="树状族谱工具">
       <button id="showFullTreeButton" type="button" class="active">全部族谱</button>
-      <label><span class="visually-hidden">按代查看</span><select id="generationSelect" aria-label="按代查看"><option value="" selected>按代查看</option><option value="all">全部族谱</option><option value="1">第1代</option><option value="2">第2代</option><option value="3">第3代</option><option value="4">第4代</option><option value="5">第5代</option><option value="6">第6代</option><option value="7">第7代</option><option value="8">第8代</option></select></label>
+      <label><span class="visually-hidden">按代查看</span><select id="generationSelect" aria-label="按代查看"><option value="" selected>按代查看</option><option value="all">全部族谱</option></select></label>
       <button id="openKinshipQuery" type="button">关系与称谓</button>
       <button id="openFiveGenerationQuery" type="button">五代谱</button>
       <button id="exportTreeButton" type="button">导出PDF</button>
@@ -560,7 +560,7 @@ dd { margin: 0; }
   <dialog id="kinshipDictionaryDialog" class="form-dialog kinship-dictionary-dialog">
     <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
     <h2>维护本家称谓</h2>
-    <p class="dialog-intro">只覆盖凌氏家族的实际称呼；关系计算与标准称谓不会改变。</p>
+    <p class="dialog-intro">只覆盖当前家族的实际称呼；关系计算与标准称谓不会改变。</p>
     <form id="kinshipDictionaryForm" class="member-form"><div id="kinshipDictionaryFields"></div><button type="submit" class="primary-action">保存本家称谓</button></form>
   </dialog>
   <dialog id="loginDialog" class="form-dialog">
@@ -1436,6 +1436,16 @@ async function loadCurrentFamilyTree() {
   const canvasLockButton = document.querySelector("#canvasLockButton");
   const treeToolStatus = document.querySelector("#treeToolStatus");
   const generationSelect = document.querySelector("#generationSelect");
+  const availableGenerations = [...new Set(data.people
+    .filter((person) => (person.lineage === "ling" || person.fatherId || person.motherId) && Number.isInteger(Number(person.generation)))
+    .map((person) => Number(person.generation)))]
+    .sort((a, b) => a - b);
+  availableGenerations.forEach((generation) => {
+    const option = document.createElement("option");
+    option.value = String(generation);
+    option.textContent = `第${generation}代`;
+    generationSelect.appendChild(option);
+  });
   const zoomSlider = document.querySelector("#zoomSlider");
   const fitViewButton = document.querySelector("#fitViewButton");
   const loginDialog = document.querySelector("#loginDialog");
