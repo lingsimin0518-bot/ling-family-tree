@@ -970,7 +970,9 @@ window.installFamilyFeatures = function (api) {
   function showPerson(p) {
     const dialog = document.querySelector('#memberDialog'); const detail = document.querySelector('#memberDetail'); detail.replaceChildren();
     const head = el('div', '', 'profile-heading'); const title = el('div'); title.append(el('p', `第${p.generation}代 · ${lifeLabel(p)}`, 'eyebrow'), el('h2', p.name)); head.append(avatar(p), title); detail.append(head);
-    const photoButton = button('添加 / 更换照片', () => { dialog.close(); api.openEditDialog(); }); detail.append(photoButton);
+    if (!api.isDatabaseFamily || api.canEditPerson(p)) {
+      const photoButton = button('添加 / 更换照片', () => { dialog.close(); api.openEditDialog(); }); detail.append(photoButton);
+    }
     if (p.lifeStatus === 'deceased') { const actions = el('div', '', 'member-tools'); actions.append(button('纪念', () => openMemorial(p, 'memorial')), button('陵墓', () => openMemorial(p, 'tomb'))); detail.append(actions); }
     const dl = el('dl');
     [['常用名',p.commonName],['别名',p.alias],['性别',p.gender],['出生',p.birthYear],['逝世',p.lifeStatus === 'deceased' ? p.deathDate || '日期待考' : '—'],['职业',p.occupation],['籍贯',p.hometown],['资料状态',p.synthetic ? '随机测试资料' : '家族记录 / 待核实']].forEach(([label,value]) => { const row = el('div'); row.append(el('dt',label),el('dd',value || '未记录')); dl.append(row); });
@@ -982,7 +984,18 @@ window.installFamilyFeatures = function (api) {
     siblings.sort((a,b) => parseInt(a.birthYear,10) - parseInt(b.birthYear,10) || a.name.localeCompare(b.name,'zh-CN'));
     const rank = siblings.findIndex(x => x.id === p.id);
     if (rank >= 0 && ['男','女'].includes(p.gender)) { const row = el('div'); row.append(el('dt','排行'),el('dd',`${['长','次','三','四','五','六','七','八','九'][rank] || `第${rank+1}`}${p.gender === '男' ? '子' : '女'}（按现有资料暂排，待核实）`)); dl.append(row); }
-    detail.append(button('提交修改', () => { dialog.close(); api.openEditDialog(); }));
+    const operations = el('div', '', 'member-tools');
+    if (!api.isDatabaseFamily || api.canEditPerson(p)) operations.append(button('编辑人物资料', () => { dialog.close(); api.openEditDialog(); }));
+    if (api.isDatabaseFamily && api.canAddPeople) {
+      operations.append(
+        button('添加父亲', () => { dialog.close(); api.openPersistentAdd('PARENT', p, '男'); }),
+        button('添加母亲', () => { dialog.close(); api.openPersistentAdd('PARENT', p, '女'); }),
+        button('添加配偶', () => { dialog.close(); api.openPersistentAdd('SPOUSE', p); }),
+        button('添加子女', () => { dialog.close(); api.openPersistentAdd('CHILD', p); })
+      );
+    }
+    if (api.isDatabaseFamily && !p.linkedUserId) operations.append(button('认领本人', () => api.claimPerson(p)));
+    if (operations.children.length) detail.append(operations);
     if (!dialog.open) dialog.showModal();
   }
   function extendEdit(form, p) {
@@ -1313,6 +1326,7 @@ async function loadCurrentFamilyTree() {
       birthYear: person.birth_year || '未记录',
       occupation: '未记录',
       biography: person.biography || '生平资料暂未收集。',
+      createdByUserId: person.created_by_user_id || null,
       fatherId: null,
       motherId: null,
       linkedUserId: person.linked_user_id || null
@@ -1371,6 +1385,11 @@ async function loadCurrentFamilyTree() {
       familyId: requestedFamilyId,
       family,
       role: payload.role,
+      currentUserId: payload.currentUserId,
+      claims: payload.claims || [],
+      members: payload.members || [],
+      media: payload.media || [],
+      relationships: payload.relationships || [],
       people,
       unions,
       metadata: {
@@ -1470,6 +1489,34 @@ async function loadCurrentFamilyTree() {
   let kinshipPersonA = null;
   let kinshipPersonB = null;
   let features;
+  const isDatabaseFamily = data.family?.source_type === 'DATABASE';
+  const canManageAll = ['OWNER', 'ADMIN'].includes(data.role);
+  const canAddPeople = ['OWNER', 'ADMIN', 'EDITOR'].includes(data.role);
+
+  async function familyAction(action, payload = {}) {
+    const response = await fetch('/api/families', {
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, familyId: data.familyId, ...payload })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || '操作失败');
+    return result;
+  }
+
+  function canEditPerson(person) {
+    return canManageAll || (data.role === 'EDITOR' && person.createdByUserId && person.createdByUserId === data.currentUserId);
+  }
+
+  async function runFamilyAction(action, payload, success) {
+    try {
+      actionStatus.textContent = '正在保存…';
+      await familyAction(action, payload);
+      actionStatus.textContent = success;
+      window.location.reload();
+    } catch (error) {
+      actionStatus.textContent = error instanceof Error ? error.message : '操作失败';
+    }
+  }
   function pinyinInitials(name) {
     return window.FamilyNameSearch.initials(name);
   }
@@ -2062,28 +2109,63 @@ async function loadCurrentFamilyTree() {
       actionStatus.textContent = "请先点击并查看一位人物，再选择编辑。";
       return;
     }
+    if (isDatabaseFamily && !canEditPerson(lastViewedPerson)) { actionStatus.textContent = '你没有权限修改这位人物。'; return; }
     editDialogContent.innerHTML = `
       <h2>申请修改：${escapeHtml(lastViewedPerson.name)}</h2>
       <form id="editForm" class="member-form">
         <label>姓名<input name="name" required value="${escapeHtml(lastViewedPerson.name)}"></label>
         <label>出生年份<input name="birthYear" required value="${escapeHtml(lastViewedPerson.birthYear)}"></label>
-        <label>职业<input name="occupation" required value="${escapeHtml(lastViewedPerson.occupation)}"></label>
+        ${isDatabaseFamily ? '' : `<label>职业<input name="occupation" required value="${escapeHtml(lastViewedPerson.occupation)}"></label>`}
         <label>生平简历<textarea name="biography" rows="5" required>${escapeHtml(lastViewedPerson.biography)}</textarea></label>
-        <label>修改理由<textarea name="reason" rows="2" required placeholder="请说明资料来源或修改原因"></textarea></label>
-        <button type="submit" class="primary-action">提交管理员审核</button>
+        ${isDatabaseFamily ? '' : '<label>修改理由<textarea name="reason" rows="2" required placeholder="请说明资料来源或修改原因"></textarea></label>'}
+        <button type="submit" class="primary-action">${isDatabaseFamily ? '保存人物资料' : '提交管理员审核'}</button>
       </form>`;
     editDialogContent.querySelector("#editForm").addEventListener("submit", (event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
+      if (isDatabaseFamily) {
+        void runFamilyAction('UPDATE_PERSON', { personId:lastViewedPerson.id, name:form.get('name'), gender:features.readGender(form), birthYear:form.get('birthYear'), biography:form.get('biography') }, '人物资料已更新。');
+        editDialog.close();
+        return;
+      }
       const extra = features ? features.readEdit(form) : {};
       queueReview({ type: "edit", personId: lastViewedPerson.id, title: `修改 ${lastViewedPerson.name}`, patch: { name: form.get("name"), birthYear: form.get("birthYear"), occupation: form.get("occupation"), biography: form.get("biography"), ...extra }, reason: form.get("reason") });
       editDialog.close();
     });
-    if (features) features.extendEdit(editDialogContent.querySelector('#editForm'), lastViewedPerson);
+    if (features && !isDatabaseFamily) features.extendEdit(editDialogContent.querySelector('#editForm'), lastViewedPerson);
+    if (features && isDatabaseFamily) features.genderInput(editDialogContent.querySelector('#editForm'), lastViewedPerson.gender);
     editDialog.showModal();
   }
 
+  function openPersistentAdd(direction, reference, genderPreset = '') {
+    if (!isDatabaseFamily) { openAddDialog(); return; }
+    if (!canAddPeople) { actionStatus.textContent = '当前权限只能查看，不能添加人物。'; return; }
+    const labels = { INITIAL:'添加初始人物', PARENT:genderPreset === '男' ? '添加父亲' : genderPreset === '女' ? '添加母亲' : '添加父母', CHILD:'添加子女', SPOUSE:'添加配偶' };
+    addDialogContent.innerHTML = `
+      <h2>${labels[direction]}${reference ? `：${escapeHtml(reference.name)}` : ''}</h2>
+      <form id="databaseAddForm" class="member-form">
+        <label>姓名<input name="name" required maxlength="80"></label>
+        <label>性别<select name="gender"><option value="男">男</option><option value="女">女</option><option value="custom">自定义（自由填写）</option></select></label>
+        <label>出生年份<input name="birthYear" maxlength="30" placeholder="可留空或填写待考"></label>
+        <label>生平资料<textarea name="biography" rows="4"></textarea></label>
+        <button type="submit" class="primary-action">保存人物与关系</button>
+      </form>`;
+    const form = addDialogContent.querySelector('#databaseAddForm');
+    features.genderInput(form, genderPreset || '男');
+    form.addEventListener('submit', event => {
+      event.preventDefault(); const values = new FormData(event.currentTarget);
+      void runFamilyAction('ADD_PERSON', { direction, referencePersonId:reference?.id, name:values.get('name'), gender:features.readGender(values), birthYear:values.get('birthYear'), biography:values.get('biography') }, '人物与关系已保存。');
+      addDialog.close();
+    });
+    addDialog.showModal();
+  }
+
   function openAddDialog() {
+    if (isDatabaseFamily) {
+      if (!data.people.length) openPersistentAdd('INITIAL', null);
+      else actionStatus.textContent = '请先打开一个人物详情，再选择添加父亲、母亲、配偶或子女。';
+      return;
+    }
     const eligibleParents = data.people.filter((person) => person.lineage === "ling" && person.generation < data.metadata.maxGeneration);
     addDialogContent.innerHTML = `
       <h2>添加家族成员</h2>
@@ -2207,6 +2289,44 @@ async function loadCurrentFamilyTree() {
     });
   }
 
+  async function claimDatabasePerson(person) {
+    if (!isDatabaseFamily) return;
+    try {
+      await familyAction('CLAIM_PERSON', { personId:person.id });
+      actionStatus.textContent = '认领申请已提交，等待创建者或管理员审核。';
+      memberDialog.close();
+    } catch (error) { actionStatus.textContent = error instanceof Error ? error.message : '认领失败'; }
+  }
+
+  function renderDatabaseManagement() {
+    reviewList.replaceChildren();
+    const heading = document.createElement('p');
+    heading.className = 'detail-note';
+    heading.textContent = `当前族谱成员 ${data.members?.length || 0} 人；待处理认领 ${data.claims?.filter(item => item.status === 'PENDING').length || 0} 条。`;
+    reviewList.append(heading);
+    (data.members || []).forEach(member => {
+      const row = document.createElement('article'); row.className = 'review-item';
+      const label = document.createElement('strong'); label.textContent = `${member.display_name || member.email || '族人'} · ${member.role}`;
+      row.append(label);
+      if (data.role === 'OWNER' && member.role !== 'OWNER') {
+        const select = document.createElement('select');
+        ['ADMIN','EDITOR','VIEWER'].forEach(role => { const option=document.createElement('option'); option.value=role; option.textContent={ADMIN:'管理员',EDITOR:'编辑成员',VIEWER:'查看成员'}[role]; select.append(option); });
+        select.value = member.role;
+        select.addEventListener('change', () => void runFamilyAction('SET_MEMBER_ROLE', { targetUserId:member.user_id, role:select.value }, '成员权限已更新。'));
+        row.append(select);
+      }
+      reviewList.append(row);
+    });
+    (data.claims || []).filter(item => item.status === 'PENDING').forEach(claim => {
+      const row=document.createElement('article'); row.className='review-item';
+      row.innerHTML=`<div><strong>${escapeHtml(claim.user_name || '族人')} 申请认领 ${escapeHtml(claim.person_name || '人物')}</strong><small>${escapeHtml(claim.created_at || '')}</small></div>`;
+      const actions=document.createElement('div'); actions.className='review-actions';
+      ['APPROVED','REJECTED'].forEach(decision => { const button=document.createElement('button'); button.type='button'; button.textContent=decision === 'APPROVED' ? '通过' : '驳回'; button.addEventListener('click',()=>void runFamilyAction('REVIEW_CLAIM',{claimId:claim.id,decision},decision === 'APPROVED' ? '认领已通过。' : '认领已驳回。')); actions.append(button); });
+      row.append(actions); reviewList.append(row);
+    });
+    reviewDialog.showModal();
+  }
+
   function updateSearch(value) {
     const query = value.trim();
     const cards = [...document.querySelectorAll(".person-card")];
@@ -2259,7 +2379,7 @@ async function loadCurrentFamilyTree() {
   document.querySelector("#privacyButton").addEventListener("click", () => privacyDialog.showModal());
   document.querySelector("#addMemberButton").addEventListener("click", openAddDialog);
   document.querySelector("#editMemberButton").addEventListener("click", openEditDialog);
-  reviewButton.addEventListener("click", () => { if (currentRole !== "admin") return; renderReviews(); reviewDialog.showModal(); });
+  reviewButton.addEventListener("click", () => { if (currentRole !== "admin") return; if (isDatabaseFamily) renderDatabaseManagement(); else { renderReviews(); reviewDialog.showModal(); } });
   loginButton.addEventListener("click", () => loginDialog.showModal());
   function activateView(view) {
     document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
@@ -2375,7 +2495,16 @@ async function loadCurrentFamilyTree() {
   });
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
-  features = window.installFamilyFeatures({ data, peopleById, partnerOf, childrenOf, showPerson, openEditDialog, queueReview, getRole: () => currentRole, login: () => loginDialog.showModal(), bookCollections, renderTree });
+  features = window.installFamilyFeatures({ data, peopleById, partnerOf, childrenOf, showPerson, openEditDialog, openPersistentAdd, claimPerson:claimDatabasePerson, canEditPerson, canAddPeople, isDatabaseFamily, queueReview, getRole: () => currentRole, login: () => loginDialog.showModal(), bookCollections, renderTree });
+  if (isDatabaseFamily) {
+    currentRole = canManageAll ? 'admin' : data.role === 'EDITOR' ? 'member' : 'viewer';
+    actionBar.hidden = data.role === 'VIEWER';
+    accountLabel.textContent = `${data.role} · 已登录`;
+    loginButton.hidden = true;
+    reviewButton.hidden = !canManageAll;
+    editKinshipDictionaryButton.hidden = !canManageAll;
+    actionStatus.textContent = data.role === 'VIEWER' ? '当前为只读权限。' : '人物与关系修改将保存到当前族谱。';
+  }
   updateReviewBadge();
   renderTree();
 })();

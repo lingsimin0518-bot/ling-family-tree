@@ -1,4 +1,4 @@
-import { addPerson, claimPerson, createFamily, deleteFamily, ensureUser, getFamilyTree, joinFamily, listFamilies, reviewClaim, setMemberRole } from '../../../lib/family-store';
+import { addPerson, addRelationship, claimPerson, createFamily, deleteFamily, ensureUser, getFamilyTree, getPersonDetail, joinFamily, listFamilies, reviewClaim, setMemberRole, updatePerson } from '../../../lib/family-store';
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
@@ -14,6 +14,8 @@ export async function GET(request: Request) {
   try {
     const user = await ensureUser(request);
     const familyId = new URL(request.url).searchParams.get('family_id');
+    const personId = new URL(request.url).searchParams.get('person_id');
+    if (familyId && personId) return json(await getPersonDetail(user.id, familyId, personId));
     if (familyId) return json(await getFamilyTree(user.id, familyId));
     return json({ user, families: await listFamilies(user.id) });
   } catch (error) {
@@ -33,6 +35,8 @@ export async function POST(request: Request) {
     if (body.action === 'JOIN_FAMILY') return json(await joinFamily(user.id, String(body.code ?? '')));
     if (body.action === 'DELETE_FAMILY') return json(await deleteFamily(user.id, String(body.familyId ?? ''), String(body.confirmedName ?? '')));
     if (body.action === 'ADD_PERSON') return json(await addPerson(user.id, body as never), 201);
+    if (body.action === 'UPDATE_PERSON') return json(await updatePerson(user.id, String(body.familyId ?? ''), String(body.personId ?? ''), body as never));
+    if (body.action === 'ADD_RELATIONSHIP') return json(await addRelationship(user.id, String(body.familyId ?? ''), String(body.fromPersonId ?? ''), String(body.toPersonId ?? ''), String(body.type ?? '') as never), 201);
     if (body.action === 'CLAIM_PERSON') return json(await claimPerson(user.id, String(body.familyId ?? ''), String(body.personId ?? '')), 201);
     if (body.action === 'SET_MEMBER_ROLE') return json(await setMemberRole(user.id, String(body.familyId ?? ''), String(body.targetUserId ?? ''), String(body.role ?? '') as never));
     if (body.action === 'REVIEW_CLAIM') return json(await reviewClaim(user.id, String(body.familyId ?? ''), String(body.claimId ?? ''), String(body.decision ?? '') as never));
