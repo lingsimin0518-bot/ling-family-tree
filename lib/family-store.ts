@@ -64,8 +64,9 @@ export async function deleteFamily(userId: string, familyId: string, confirmedNa
   const family = await db().prepare('SELECT id,name FROM families WHERE id=?').bind(familyId).first<{ id:string; name:string }>();
   if (!family) throw new Response('族谱不存在', { status: 404 });
   if (confirmedName !== family.name) throw new Response('输入的族谱名称不一致，已取消删除', { status: 400 });
-  const result = await db().prepare("DELETE FROM families WHERE id=? AND name=? AND source_type='DATABASE'").bind(familyId, confirmedName).run();
-  if (result.meta.changes !== 1) throw new Response('族谱未被删除', { status: 409 });
+  await db().prepare("DELETE FROM families WHERE id=? AND name=? AND source_type='DATABASE'").bind(familyId, confirmedName).run();
+  const remaining = await db().prepare('SELECT id FROM families WHERE id=?').bind(familyId).first();
+  if (remaining) throw new Response('族谱未被删除', { status: 409 });
   return { id: familyId, deleted: true };
 }
 
