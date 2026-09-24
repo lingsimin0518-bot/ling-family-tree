@@ -22,6 +22,11 @@ function db() {
   return binding;
 }
 
+function toText(value: unknown) {
+  // oxlint-disable-next-line typescript/no-base-to-string
+  return String(value ?? '');
+}
+
 function bytesToBase64(bytes: Uint8Array) {
   let binary = '';
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
@@ -78,34 +83,34 @@ function parseCookies(request: Request) {
 
 function publicUser(row: Record<string, unknown>): AuthUser {
   return {
-    id:String(row.id),
-    username:String(row.username ?? ''),
-    email:String(row.email ?? ''),
-    phone:String(row.phone ?? ''),
-    nickname:String(row.nickname ?? row.display_name ?? row.username ?? '族人'),
-    avatar:String(row.avatar ?? ''),
-    status:String(row.status ?? 'ACTIVE'),
-    systemRole:String(row.system_role ?? 'USER') === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'USER',
+    id:toText(row.id),
+    username:toText(row.username),
+    email:toText(row.email),
+    phone:toText(row.phone),
+    nickname:toText(row.nickname ?? row.display_name ?? row.username ?? '族人'),
+    avatar:toText(row.avatar),
+    status:toText(row.status ?? 'ACTIVE'),
+    systemRole:toText(row.system_role ?? 'USER') === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'USER',
   };
 }
 
 function normalizeEmail(value: unknown) {
-  return String(value ?? '').trim().toLowerCase();
+  return toText(value).trim().toLowerCase();
 }
 
 function normalizePhone(value: unknown) {
-  const source = String(value ?? '').trim();
+  const source = toText(value).trim();
   if (!source) return '';
   const prefix = source.startsWith('+') ? '+' : '';
   return prefix + source.replace(/\D/g, '');
 }
 
 function validateRegistration(input: Record<string,unknown>) {
-  const username = String(input.username ?? '').trim();
-  const password = String(input.password ?? '');
-  const confirmPassword = String(input.confirmPassword ?? '');
+  const username = toText(input.username).trim();
+  const password = toText(input.password);
+  const confirmPassword = toText(input.confirmPassword);
   const email = normalizeEmail(input.email);
-  const rawPhone = String(input.phone ?? '').trim();
+  const rawPhone = toText(input.phone).trim();
   const phone = normalizePhone(rawPhone);
   if (username.length < 1 || username.length > 32) throw new Response('用户名长度需要为1至32个字符', {status:400});
   if (!/^[\p{L}\p{N}_]+$/u.test(username)) throw new Response('用户名只能包含中文、字母、数字或下划线', {status:400});
@@ -118,7 +123,7 @@ function validateRegistration(input: Record<string,unknown>) {
 }
 
 function registrationConflictMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : toText(error);
   if (/users\.username|idx_users_username_unique/i.test(message)) return '该用户名已被使用';
   if (/users\.email|idx_users_email_unique/i.test(message)) return '该邮箱已被注册';
   if (/users\.phone|idx_users_phone_unique/i.test(message)) return '该手机号已被注册';
@@ -173,16 +178,16 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
 }
 
 export async function loginUser(input: Record<string,unknown>, request: Request) {
-  const username = String(input.username ?? '').trim();
-  const password = String(input.password ?? '');
+  const username = toText(input.username).trim();
+  const password = toText(input.password);
   if (!username || !password) throw new Response('请输入用户名和密码', {status:400});
   const row = await db().prepare('SELECT id,username,password_hash,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE username=? COLLATE NOCASE')
     .bind(username).first<Record<string,unknown>>();
-  if (!row || !row.password_hash || !(await verifyPassword(password,String(row.password_hash)))) throw new Response('用户名或密码不正确', {status:401});
-  if (String(row.status ?? 'ACTIVE') !== 'ACTIVE') throw new Response('该账号当前不可登录，请联系管理员', {status:403});
+  if (!row || !row.password_hash || !(await verifyPassword(password,toText(row.password_hash)))) throw new Response('用户名或密码不正确', {status:401});
+  if (toText(row.status ?? 'ACTIVE') !== 'ACTIVE') throw new Response('该账号当前不可登录，请联系管理员', {status:403});
   const loginTime = new Date().toISOString();
-  await db().prepare('UPDATE users SET last_login_at=?,updated_at=? WHERE id=?').bind(loginTime,loginTime,String(row.id)).run();
-  return {user:publicUser(row),cookie:await createSession(String(row.id),request)};
+  await db().prepare('UPDATE users SET last_login_at=?,updated_at=? WHERE id=?').bind(loginTime,loginTime,toText(row.id)).run();
+  return {user:publicUser(row),cookie:await createSession(toText(row.id),request)};
 }
 
 export async function getSessionUser(request: Request) {

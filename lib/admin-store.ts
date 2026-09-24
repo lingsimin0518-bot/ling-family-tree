@@ -22,11 +22,12 @@ export async function adminOverview(request:Request) {
     db().prepare("SELECT COUNT(*) total FROM users WHERE status!='ACTIVE'"),
     db().prepare('SELECT COUNT(*) total FROM system_audit_logs'),
   ]);
+  type CountRow = { total: number | string };
   return {
-    users:Number(users.results?.[0]?.total ?? 0),
-    families:Number(families.results?.[0]?.total ?? 0),
-    disabledUsers:Number(disabled.results?.[0]?.total ?? 0),
-    logs:Number(logs.results?.[0]?.total ?? 0),
+    users:Number((users.results as CountRow[])[0]?.total ?? 0),
+    families:Number((families.results as CountRow[])[0]?.total ?? 0),
+    disabledUsers:Number((disabled.results as CountRow[])[0]?.total ?? 0),
+    logs:Number((logs.results as CountRow[])[0]?.total ?? 0),
   };
 }
 

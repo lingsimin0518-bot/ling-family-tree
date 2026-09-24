@@ -1,16 +1,18 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { SyntheticEvent, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import './auth.css';
 
 type User = { id:string; username:string; email:string; phone:string; nickname:string; avatar:string; status:string; systemRole:'USER'|'SUPER_ADMIN' };
 type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
 type Family = { id:string; name:string; description?:string; join_code:string; source_type:'DATABASE'|'LEGACY_STATIC'; role:Role };
 type FamilyLoadState = 'idle' | 'loading' | 'empty' | 'ready' | 'error';
+type FormSubmitEvent = SyntheticEvent<HTMLFormElement, SubmitEvent>;
 
 const roleNames:Record<Role,string> = { OWNER:'创建者', ADMIN:'管理员', EDITOR:'编辑成员', VIEWER:'查看成员' };
 
-async function requestJson<T = any>(url:string, init?:RequestInit):Promise<T> {
+async function requestJson<T = unknown>(url:string, init?:RequestInit):Promise<T> {
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({})) as T & { error?:string; retryAfterSeconds?:number };
   if (!response.ok) {
@@ -37,7 +39,7 @@ export default function FamilyPortal() {
   const [deleteTarget,setDeleteTarget] = useState<Family|null>(null);
   const [deleteName,setDeleteName] = useState('');
   const [cooldowns,setCooldowns] = useState<Record<string,number>>({});
-  const [clock,setClock] = useState(Date.now());
+  const [clock,setClock] = useState(0);
   const current = families.find((family) => family.id === currentId) ?? families[0];
   useEffect(() => {
     if (!Object.values(cooldowns).some((expiresAt) => expiresAt > Date.now())) return;
@@ -51,7 +53,7 @@ export default function FamilyPortal() {
     if (seconds) startCooldown(key,seconds);
   };
 
-  const loadFamilies = async () => {
+  const loadFamilies = useCallback(async () => {
     if (!user) return;
     setFamilyLoadState('loading');
     setFamilyLoadError('');
@@ -71,7 +73,7 @@ export default function FamilyPortal() {
       setFamilyLoadError((error as Error).message);
       setFamilyLoadState('error');
     }
-  };
+  }, [user]);
   useEffect(() => {
     requestJson<{user:User}>('/api/auth/session')
       .then((data)=>setUser(data.user))
@@ -79,10 +81,14 @@ export default function FamilyPortal() {
       .finally(()=>setAuthLoading(false));
   }, []);
   useEffect(() => {
-    if (user) void loadFamilies();
-    else { setFamilies([]); setCurrentId(''); setFamilyLoadState('idle'); }
-  }, [user?.id]);
-  const createFamily = async (event:FormEvent<HTMLFormElement>) => {
+    void Promise.resolve().then(() => {
+      if (user) return loadFamilies();
+      setFamilies([]);
+      setCurrentId('');
+      setFamilyLoadState('idle');
+    });
+  }, [user, loadFamilies]);
+  const createFamily = async (event:FormSubmitEvent) => {
     event.preventDefault();
     if (secondsLeft('CREATE_FAMILY')) return;
     const form = new FormData(event.currentTarget);
@@ -91,7 +97,7 @@ export default function FamilyPortal() {
       startCooldown('CREATE_FAMILY'); await loadFamilies(); setCurrentId(family.id); setMessage('空白族谱已创建，请添加第一位初始人物。'); event.currentTarget.reset();
     } catch (error) { captureCooldown('CREATE_FAMILY',error); setMessage((error as Error).message); }
   };
-  const joinFamily = async (event:FormEvent<HTMLFormElement>) => {
+  const joinFamily = async (event:FormSubmitEvent) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'JOIN_FAMILY',code:form.get('code')})}); await loadFamilies(); setMessage('已加入族谱。'); event.currentTarget.reset(); }
@@ -113,8 +119,8 @@ export default function FamilyPortal() {
   if (!user) return <AuthScreen onAuthenticated={setUser} />;
 
   return <main className="portal">
-    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '尚未选择族谱'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span>{user.systemRole==='SUPER_ADMIN'&&<a className="plain-button" href="/admin">系统后台</a>}<button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
-    {message && <div className="toast" onClick={() => setMessage('')}>{message}<span>×</span></div>}
+    <header className="family-bar"><div className="family-current"><span>当前族谱</span><strong>{current?.name ?? '尚未选择族谱'}</strong>{current && <em>{roleNames[current.role]}</em>}</div><div className="account-actions"><span>{user.nickname || user.username}</span>{user.systemRole==='SUPER_ADMIN'&&<Link className="plain-button" href="/admin">系统后台</Link>}<button className="gold-button" onClick={() => setShowFamilies(true)}>我的族谱</button><button className="plain-button" onClick={logout}>退出登录</button></div></header>
+    {message && <button type="button" className="toast" onClick={() => setMessage('')}>{message}<span>×</span></button>}
     {(familyLoadState==='idle' || familyLoadState==='loading') && <LoadingFamilyScreen label="正在加载你的族谱…" />}
     {familyLoadState==='empty' && <FirstUseScreen onCreate={()=>setShowFamilies(true)} onJoin={()=>setShowFamilies(true)} />}
     {familyLoadState==='error' && <LoadErrorScreen detail={familyLoadError} onRetry={()=>void loadFamilies()} />}
@@ -122,7 +128,7 @@ export default function FamilyPortal() {
     {showFamilies && <div className="veil"><section className="family-dialog"><button className="close" onClick={() => setShowFamilies(false)}>×</button><h2>我的族谱</h2><p>一个账号可以加入多本族谱，切换后所有人物与资料互不混用。</p>
       <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><div className="family-row-actions"><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button>{family.role==='OWNER'&&family.source_type!=='LEGACY_STATIC'&&<button className="danger-link" onClick={()=>{setDeleteTarget(family);setDeleteName('')}}>删除</button>}</div></article>)}</div>
       <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button disabled={secondsLeft('CREATE_FAMILY')>0}>{secondsLeft('CREATE_FAMILY')>0?`${secondsLeft('CREATE_FAMILY')}秒后可再次创建`:'创建族谱'}</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>
-      {deleteTarget&&<section className="delete-confirm" role="alertdialog" aria-modal="true" aria-labelledby="delete-family-title"><h3 id="delete-family-title">永久删除“{deleteTarget.name}”？</h3><p>人物、关系、公告、媒体和成员权限都会一并删除，无法恢复。请输入完整族谱名称确认：</p><input value={deleteName} onChange={event=>setDeleteName(event.target.value)} placeholder={deleteTarget.name} autoFocus/><div><button className="cancel-delete" onClick={()=>{setDeleteTarget(null);setDeleteName('')}}>取消</button><button className="confirm-delete" disabled={deleteName!==deleteTarget.name} onClick={deleteSelectedFamily}>确认永久删除</button></div></section>}
+      {deleteTarget&&<section className="delete-confirm" role="alertdialog" aria-modal="true" aria-labelledby="delete-family-title"><h3 id="delete-family-title">永久删除“{deleteTarget.name}”？</h3><p>人物、关系、公告、媒体和成员权限都会一并删除，无法恢复。请输入完整族谱名称确认：</p><input value={deleteName} onChange={event=>setDeleteName(event.target.value)} placeholder={deleteTarget.name}/><div><button className="cancel-delete" onClick={()=>{setDeleteTarget(null);setDeleteName('')}}>取消</button><button className="confirm-delete" disabled={deleteName!==deleteTarget.name} onClick={deleteSelectedFamily}>确认永久删除</button></div></section>}
     </section></div>}
   </main>;
 }
@@ -163,7 +169,7 @@ function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
   const [submitting,setSubmitting] = useState(false);
   const [showPassword,setShowPassword] = useState(false);
   const [showConfirmPassword,setShowConfirmPassword] = useState(false);
-  const submit = async (event:FormEvent<HTMLFormElement>) => {
+  const submit = async (event:FormSubmitEvent) => {
     event.preventDefault(); setError(''); setSubmitting(true);
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {

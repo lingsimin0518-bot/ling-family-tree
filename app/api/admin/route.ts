@@ -1,6 +1,10 @@
 import { adminFamilies, adminLogs, adminOverview, adminUserDetail, adminUsers, updateUserStatus } from '../../../lib/admin-store';
 
 function json(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}})}
+function toText(value:unknown){
+  // oxlint-disable-next-line typescript/no-base-to-string
+  return String(value??'');
+}
 async function failure(error:unknown){
   if(error instanceof Response)return json({error:await error.text()},error.status);
   console.error('admin api failed',error);
@@ -23,8 +27,8 @@ export async function GET(request:Request){
 export async function POST(request:Request){
   try{
     const body=await request.json() as Record<string,unknown>;
-    const action=String(body.action??'');
+    const action=toText(body.action);
     if(!['DISABLE_USER','RESTORE_USER','FORCE_LOGOUT'].includes(action))return json({error:'不支持的后台操作'},400);
-    return json(await updateUserStatus(request,String(body.targetUserId??''),action as never,String(body.reason??'')));
+    return json(await updateUserStatus(request,toText(body.targetUserId),action as never,toText(body.reason)));
   }catch(error){return failure(error)}
 }
