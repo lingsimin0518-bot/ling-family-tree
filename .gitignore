@@ -36,3 +36,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# Unrelated paused Java migration prototype; never publish with the Worker site.
+/backend-java/
