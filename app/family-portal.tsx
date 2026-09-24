@@ -1,20 +1,14 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import './auth.css';
 
 type User = { id:string; username:string; email:string; phone:string; nickname:string; avatar:string; status:string; systemRole:'USER'|'SUPER_ADMIN' };
 type Role = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
 type Family = { id:string; name:string; description?:string; join_code:string; source_type:'DATABASE'|'LEGACY_STATIC'; role:Role };
-type Person = { id:string; name:string; gender?:string; generation:number; birth_year?:string; biography?:string; linked_user_id?:string|null };
-type Relation = { id:string; from_person_id:string; to_person_id:string; type:'PARENT'|'CHILD'|'SPOUSE' };
-type Claim = { id:string; person_id:string; status:string; person_name?:string; user_name?:string };
-type Member = { user_id:string; role:Role; display_name?:string; email?:string };
-type Tree = { family:Family; role:Role; people:Person[]; relationships:Relation[]; claims:Claim[]; members:Member[] };
 type FamilyLoadState = 'idle' | 'loading' | 'empty' | 'ready' | 'error';
 
 const roleNames:Record<Role,string> = { OWNER:'创建者', ADMIN:'管理员', EDITOR:'编辑成员', VIEWER:'查看成员' };
-const directions = { INITIAL:'初始人物', PARENT:'添加父亲或母亲', CHILD:'添加子女', SPOUSE:'添加配偶' } as const;
 
 async function requestJson<T = any>(url:string, init?:RequestInit):Promise<T> {
   const response = await fetch(url, init);
@@ -27,7 +21,6 @@ async function requestJson<T = any>(url:string, init?:RequestInit):Promise<T> {
   }
   return data;
 }
-
 function creationHeaders(idempotencyKey:string) {
   return {'content-type':'application/json','Idempotency-Key':idempotencyKey};
 }
@@ -38,11 +31,9 @@ export default function FamilyPortal() {
   const [showFamilies,setShowFamilies] = useState(false);
   const [user,setUser] = useState<User|null>(null);
   const [authLoading,setAuthLoading] = useState(true);
-  const [tree,setTree] = useState<Tree|null>(null);
   const [familyLoadState,setFamilyLoadState] = useState<FamilyLoadState>('idle');
   const [familyLoadError,setFamilyLoadError] = useState('');
   const [message,setMessage] = useState('');
-  const [addTarget,setAddTarget] = useState<{direction:keyof typeof directions;reference?:Person}|null>(null);
   const [deleteTarget,setDeleteTarget] = useState<Family|null>(null);
   const [deleteName,setDeleteName] = useState('');
   const [cooldowns,setCooldowns] = useState<Record<string,number>>({});
@@ -69,7 +60,6 @@ export default function FamilyPortal() {
       setFamilies(data.families);
       if (!data.families.length) {
         setCurrentId('');
-        setTree(null);
         setFamilyLoadState('empty');
       } else {
         setCurrentId((selected) => data.families.some((family:Family) => family.id === selected) ? selected : data.families[0].id);
@@ -78,7 +68,6 @@ export default function FamilyPortal() {
     } catch (error) {
       setFamilies([]);
       setCurrentId('');
-      setTree(null);
       setFamilyLoadError((error as Error).message);
       setFamilyLoadState('error');
     }
@@ -93,16 +82,6 @@ export default function FamilyPortal() {
     if (user) void loadFamilies();
     else { setFamilies([]); setCurrentId(''); setFamilyLoadState('idle'); }
   }, [user?.id]);
-  useEffect(() => {
-    if (!current || familyLoadState !== 'ready') { setTree(null); return; }
-    requestJson<Tree>(`/api/families?family_id=${encodeURIComponent(current.id)}`)
-      .then(setTree).catch((error) => setMessage(error.message));
-  }, [current?.id, familyLoadState]);
-
-  const refreshTree = async () => {
-    if (!current) return;
-    setTree(await requestJson<Tree>(`/api/families?family_id=${encodeURIComponent(current.id)}`));
-  };
   const createFamily = async (event:FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (secondsLeft('CREATE_FAMILY')) return;
@@ -125,33 +104,9 @@ export default function FamilyPortal() {
       setDeleteTarget(null); setDeleteName(''); setCurrentId(''); await loadFamilies(); setMessage('族谱已永久删除。');
     } catch (error) { setMessage((error as Error).message); }
   };
-  const addPerson = async (event:FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!current || !addTarget) return;
-    const form = new FormData(event.currentTarget);
-    const actionKey = `${current.id}:${addTarget.direction}:${addTarget.direction==='PARENT'?String(form.get('gender')||''):''}`;
-    if (secondsLeft(actionKey)) return;
-    try {
-      await requestJson('/api/families',{method:'POST',headers:creationHeaders(crypto.randomUUID()),body:JSON.stringify({action:'ADD_PERSON',familyId:current.id,direction:addTarget.direction,referencePersonId:addTarget.reference?.id,name:form.get('name'),gender:form.get('gender'),birthYear:form.get('birthYear'),biography:form.get('biography')})});
-      startCooldown(actionKey); setAddTarget(null); await refreshTree(); setMessage('人物已加入，世代编号已自动重新计算。');
-    } catch (error) { captureCooldown(actionKey,error); setMessage((error as Error).message); }
-  };
-  const claim = async (personId:string) => {
-    if (!current) return;
-    const actionKey = `${current.id}:SUBMIT_CLAIM`;
-    if (secondsLeft(actionKey)) return;
-    try { await requestJson('/api/families',{method:'POST',headers:creationHeaders(crypto.randomUUID()),body:JSON.stringify({action:'CLAIM_PERSON',familyId:current.id,personId})}); startCooldown(actionKey); await refreshTree(); setMessage('认领申请已提交，审核通过后才会关联账号。'); }
-    catch (error) { captureCooldown(actionKey,error); setMessage((error as Error).message); }
-  };
-  const manage = async (body:Record<string,unknown>) => {
-    if (!current) return;
-    try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...body,familyId:current.id})}); await refreshTree(); setMessage('处理完成。'); }
-    catch (error) { setMessage((error as Error).message); }
-  };
-
   const logout = async () => {
     try { await requestJson('/api/auth/logout',{method:'POST'}); }
-    finally { setUser(null); setTree(null); setCurrentId(''); setFamilyLoadState('idle'); setShowFamilies(false); setMessage('已安全退出登录。'); }
+    finally { setUser(null); setCurrentId(''); setFamilyLoadState('idle'); setShowFamilies(false); setMessage('已安全退出登录。'); }
   };
 
   if (authLoading) return <main className="portal"><LoadingFamilyScreen label="正在加载你的族谱…" /></main>;
@@ -169,7 +124,6 @@ export default function FamilyPortal() {
       <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button disabled={secondsLeft('CREATE_FAMILY')>0}>{secondsLeft('CREATE_FAMILY')>0?`${secondsLeft('CREATE_FAMILY')}秒后可再次创建`:'创建族谱'}</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>
       {deleteTarget&&<section className="delete-confirm" role="alertdialog" aria-modal="true" aria-labelledby="delete-family-title"><h3 id="delete-family-title">永久删除“{deleteTarget.name}”？</h3><p>人物、关系、公告、媒体和成员权限都会一并删除，无法恢复。请输入完整族谱名称确认：</p><input value={deleteName} onChange={event=>setDeleteName(event.target.value)} placeholder={deleteTarget.name} autoFocus/><div><button className="cancel-delete" onClick={()=>{setDeleteTarget(null);setDeleteName('')}}>取消</button><button className="confirm-delete" disabled={deleteName!==deleteTarget.name} onClick={deleteSelectedFamily}>确认永久删除</button></div></section>}
     </section></div>}
-    {addTarget && <div className="veil"><form className="person-dialog" onSubmit={addPerson}><button type="button" className="close" onClick={() => setAddTarget(null)}>×</button><h2>{directions[addTarget.direction]}</h2>{addTarget.reference && <p>以 <strong>{addTarget.reference.name}</strong> 为参照添加</p>}<label>姓名<input name="name" required autoFocus /></label><label>性别<input name="gender" placeholder="可自由填写" /></label><label>出生年份<input name="birthYear" inputMode="numeric" /></label><label>人物生平<textarea name="biography" rows={4}/></label><button className="submit">保存人物</button></form></div>}
   </main>;
 }
 
@@ -234,13 +188,4 @@ function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
     </form>
     <small className="auth-note">密码经过加盐哈希后保存，网站不会存储明文密码。</small>
   </section></main>;
-}
-
-function DatabaseTree({tree,onAdd,onClaim,onManage}:{tree:Tree|null;onAdd:(target:{direction:keyof typeof directions;reference?:Person})=>void;onClaim:(id:string)=>void;onManage:(body:Record<string,unknown>)=>void}) {
-  const canEdit = tree && tree.role !== 'VIEWER';
-  const generations = useMemo(() => { const result = new Map<number,Person[]>(); tree?.people.forEach((person) => result.set(person.generation,[...(result.get(person.generation) ?? []),person])); return [...result.entries()].sort((a,b)=>a[0]-b[0]); },[tree]);
-  if (!tree) return null;
-  if (!tree.people.length) return <section className="empty-family"><div className="seal">谱</div><h1>{tree.family.name}</h1><p>这是一本空白族谱。第一位人物只是建立关系的初始人物，并不会被自动标记为始祖。</p>{canEdit?<button onClick={()=>onAdd({direction:'INITIAL'})}>添加第一位初始人物</button>:<p>请联系编辑成员添加第一位人物。</p>}</section>;
-  const relationshipText = (person:Person) => tree.relationships.filter((item)=>item.from_person_id===person.id||item.to_person_id===person.id).map((item)=>{ const otherId=item.from_person_id===person.id?item.to_person_id:item.from_person_id; const other=tree.people.find((one)=>one.id===otherId); return `${item.type==='SPOUSE'?'配偶':item.from_person_id===person.id?'子女':'父母'}：${other?.name??'未知'}`; });
-  return <section className="database-tree"><div className="tree-heading"><span>独立族谱</span><h1>{tree.family.name}</h1><p>加入码：<b>{tree.family.join_code}</b>　权限：{roleNames[tree.role]}</p>{(tree.role==='OWNER'||tree.role==='ADMIN')&&<details className="admin-box"><summary>成员权限与认领审核</summary>{tree.members.map(member=><div className="admin-row" key={member.user_id}><span>{member.display_name||member.email||'族人'} <small>{roleNames[member.role]}</small></span>{tree.role==='OWNER'&&member.role!=='OWNER'&&<select value={member.role} onChange={event=>onManage({action:'SET_MEMBER_ROLE',targetUserId:member.user_id,role:event.target.value})}><option value="ADMIN">管理员</option><option value="EDITOR">编辑成员</option><option value="VIEWER">查看成员</option></select>}</div>)}{tree.claims.filter(claim=>claim.status==='PENDING').map(claim=><div className="admin-row" key={claim.id}><span>{claim.user_name||'族人'} 申请认领 {claim.person_name||'人物'}</span><div><button onClick={()=>onManage({action:'REVIEW_CLAIM',claimId:claim.id,decision:'APPROVED'})}>通过</button><button onClick={()=>onManage({action:'REVIEW_CLAIM',claimId:claim.id,decision:'REJECTED'})}>驳回</button></div></div>)}</details>}</div>{generations.map(([number,people])=><section className="generation" key={number}><h2>第{number}代</h2><div className="people-grid">{people.map((person)=><article className="person-card" key={person.id}><div className="avatar">{person.name.slice(-1)}</div><h3>{person.name}</h3><p>{person.birth_year||'出生年份未录'} · {person.gender||'性别未录'}</p>{person.biography&&<blockquote>{person.biography}</blockquote>}<ul>{relationshipText(person).map((text,index)=><li key={index}>{text}</li>)}</ul><div className="person-actions">{canEdit&&<><button onClick={()=>onAdd({direction:'PARENT',reference:person})}>上添父母</button><button onClick={()=>onAdd({direction:'CHILD',reference:person})}>下添子女</button><button onClick={()=>onAdd({direction:'SPOUSE',reference:person})}>添加配偶</button></>} {!person.linked_user_id&&<button onClick={()=>onClaim(person.id)} disabled={tree.claims.some((claim)=>claim.person_id===person.id&&claim.status==='PENDING')}>{tree.claims.some((claim)=>claim.person_id===person.id&&claim.status==='PENDING')?'认领待审核':'认领本人'}</button>}</div></article>)}</div></section>)}</section>;
 }
