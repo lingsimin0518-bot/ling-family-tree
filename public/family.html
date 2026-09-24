@@ -1490,13 +1490,45 @@ async function loadCurrentFamilyTree() {
   const canManageAll = ['OWNER', 'ADMIN'].includes(data.role);
   const canAddPeople = ['OWNER', 'ADMIN', 'EDITOR'].includes(data.role);
 
+  function creationActionType(action, payload = {}) {
+    if (action === 'CLAIM_PERSON') return 'SUBMIT_CLAIM';
+    if (action === 'ADD_RELATIONSHIP') return payload.type === 'SPOUSE' ? 'ADD_SPOUSE' : 'ADD_PARENT';
+    if (action !== 'ADD_PERSON') return '';
+    if (payload.direction === 'PARENT') return payload.gender === '男' ? 'ADD_FATHER' : payload.gender === '女' ? 'ADD_MOTHER' : 'ADD_PARENT';
+    if (payload.direction === 'CHILD') return 'ADD_CHILD';
+    if (payload.direction === 'SPOUSE') return 'ADD_SPOUSE';
+    return 'CREATE_PERSON';
+  }
+
+  function cooldownStorageKey(actionType) { return `familyCooldown:${data.familyId}:${actionType}`; }
+  function rememberCooldown(actionType, seconds = 60) {
+    if (actionType) sessionStorage.setItem(cooldownStorageKey(actionType), String(Date.now() + seconds * 1000));
+  }
+  function cooldownSeconds(actionType) {
+    return Math.max(0, Math.ceil((Number(sessionStorage.getItem(cooldownStorageKey(actionType)) || 0) - Date.now()) / 1000));
+  }
+  function bindCooldownButton(button, actionType, normalText) {
+    const update = () => {
+      const remaining = cooldownSeconds(actionType);
+      button.disabled = remaining > 0;
+      button.textContent = remaining > 0 ? `${remaining}秒后可再次创建` : normalText;
+      if (remaining > 0) window.setTimeout(update, 1000);
+    };
+    update();
+  }
+
   async function familyAction(action, payload = {}) {
+    const actionType = creationActionType(action, payload);
     const response = await fetch('/api/families', {
-      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', ...(actionType ? { 'Idempotency-Key': crypto.randomUUID() } : {}) },
       body: JSON.stringify({ action, familyId: data.familyId, ...payload })
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || '操作失败');
+    if (!response.ok) {
+      if (response.status === 429) rememberCooldown(actionType, Number(result.retryAfterSeconds || response.headers.get('Retry-After') || 60));
+      throw new Error(result.error || '操作失败');
+    }
+    rememberCooldown(actionType);
     return result;
   }
 
@@ -2148,8 +2180,12 @@ async function loadCurrentFamilyTree() {
       </form>`;
     const form = addDialogContent.querySelector('#databaseAddForm');
     features.genderInput(form, genderPreset || '男');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const presetActionType = direction === 'PARENT' ? (genderPreset === '男' ? 'ADD_FATHER' : genderPreset === '女' ? 'ADD_MOTHER' : 'ADD_PARENT') : direction === 'CHILD' ? 'ADD_CHILD' : direction === 'SPOUSE' ? 'ADD_SPOUSE' : 'CREATE_PERSON';
+    bindCooldownButton(submitButton, presetActionType, '保存人物与关系');
     form.addEventListener('submit', event => {
       event.preventDefault(); const values = new FormData(event.currentTarget);
+      submitButton.disabled = true; submitButton.textContent = '正在保存…';
       void runFamilyAction('ADD_PERSON', { direction, referencePersonId:reference?.id, name:values.get('name'), gender:features.readGender(values), birthYear:values.get('birthYear'), biography:values.get('biography') }, '人物与关系已保存。');
       addDialog.close();
     });

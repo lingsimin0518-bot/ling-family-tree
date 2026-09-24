@@ -58,3 +58,32 @@ export const relationships = sqliteTable('relationships', { id:text('id').primar
 export const announcements = sqliteTable('announcements', { id:text('id').primaryKey(), familyId:text('family_id').notNull().references(()=>families.id,{onDelete:'cascade'}), authorUserId:text('author_user_id').notNull().references(()=>users.id), title:text('title').notNull(), body:text('body').notNull(), createdAt:text('created_at').notNull() }, t=>[index('idx_announcements_family_created').on(t.familyId,t.createdAt)]);
 export const media = sqliteTable('media', { id:text('id').primaryKey(), familyId:text('family_id').notNull().references(()=>families.id,{onDelete:'cascade'}), personId:text('person_id').references(()=>persons.id,{onDelete:'cascade'}), uploaderUserId:text('uploader_user_id').notNull().references(()=>users.id), kind:text('kind').notNull(), storageKey:text('storage_key').notNull(), createdAt:text('created_at').notNull() }, t=>[index('idx_media_family_person').on(t.familyId,t.personId)]);
 export const personClaims = sqliteTable('person_claims', { id:text('id').primaryKey(), familyId:text('family_id').notNull().references(()=>families.id,{onDelete:'cascade'}), userId:text('user_id').notNull().references(()=>users.id), personId:text('person_id').notNull().references(()=>persons.id,{onDelete:'cascade'}), status:text('status',{enum:['PENDING','APPROVED','REJECTED']}).notNull(), createdAt:text('created_at').notNull() }, t=>[uniqueIndex('idx_claims_family_user_person').on(t.familyId,t.userId,t.personId)]);
+
+export const actionRateLimits = sqliteTable('action_rate_limit', {
+  id:text('id').primaryKey(),
+  actorKey:text('actor_key').notNull(),
+  userId:text('user_id').references(()=>users.id,{onDelete:'cascade'}),
+  familyId:text('family_id'),
+  familyKey:text('family_key').notNull().default(''),
+  actionType:text('action_type').notNull(),
+  targetId:text('target_id'),
+  lastSuccessAt:text('last_success_at').notNull(),
+}, t=>[
+  uniqueIndex('idx_action_rate_limit_scope').on(t.actorKey,t.familyKey,t.actionType),
+  index('idx_action_rate_limit_success').on(t.lastSuccessAt),
+]);
+
+export const actionIdempotency = sqliteTable('action_idempotency', {
+  id:text('id').primaryKey(),
+  actorKey:text('actor_key').notNull(),
+  familyKey:text('family_key').notNull().default(''),
+  actionType:text('action_type').notNull(),
+  idempotencyKey:text('idempotency_key').notNull(),
+  status:text('status',{enum:['PENDING','COMPLETED']}).notNull(),
+  responseJson:text('response_json'),
+  createdAt:text('created_at').notNull(),
+  completedAt:text('completed_at'),
+}, t=>[
+  uniqueIndex('idx_action_idempotency_key').on(t.actorKey,t.familyKey,t.actionType,t.idempotencyKey),
+  index('idx_action_idempotency_created').on(t.createdAt),
+]);

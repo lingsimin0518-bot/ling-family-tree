@@ -18,9 +18,18 @@ const directions = { INITIAL:'初始人物', PARENT:'添加父亲或母亲', CHI
 
 async function requestJson<T = any>(url:string, init?:RequestInit):Promise<T> {
   const response = await fetch(url, init);
-  const data = await response.json().catch(() => ({})) as T & { error?:string };
-  if (!response.ok) throw new Error(data.error || '操作失败');
+  const data = await response.json().catch(() => ({})) as T & { error?:string; retryAfterSeconds?:number };
+  if (!response.ok) {
+    const error = new Error(data.error || '操作失败') as Error & { status?:number; retryAfterSeconds?:number };
+    error.status = response.status;
+    error.retryAfterSeconds = data.retryAfterSeconds ?? Number(response.headers.get('Retry-After') || 0);
+    throw error;
+  }
   return data;
+}
+
+function creationHeaders(idempotencyKey:string) {
+  return {'content-type':'application/json','Idempotency-Key':idempotencyKey};
 }
 
 export default function FamilyPortal() {
@@ -36,7 +45,20 @@ export default function FamilyPortal() {
   const [addTarget,setAddTarget] = useState<{direction:keyof typeof directions;reference?:Person}|null>(null);
   const [deleteTarget,setDeleteTarget] = useState<Family|null>(null);
   const [deleteName,setDeleteName] = useState('');
+  const [cooldowns,setCooldowns] = useState<Record<string,number>>({});
+  const [clock,setClock] = useState(Date.now());
   const current = families.find((family) => family.id === currentId) ?? families[0];
+  useEffect(() => {
+    if (!Object.values(cooldowns).some((expiresAt) => expiresAt > Date.now())) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldowns]);
+  const secondsLeft = (key:string) => Math.max(0,Math.ceil(((cooldowns[key] ?? 0)-clock)/1000));
+  const startCooldown = (key:string, seconds=60) => { setClock(Date.now()); setCooldowns((items)=>({...items,[key]:Date.now()+seconds*1000})); };
+  const captureCooldown = (key:string,error:unknown) => {
+    const seconds = (error as Error & {retryAfterSeconds?:number}).retryAfterSeconds;
+    if (seconds) startCooldown(key,seconds);
+  };
 
   const loadFamilies = async () => {
     if (!user) return;
@@ -83,11 +105,12 @@ export default function FamilyPortal() {
   };
   const createFamily = async (event:FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (secondsLeft('CREATE_FAMILY')) return;
     const form = new FormData(event.currentTarget);
     try {
-      const family = await requestJson<Family>('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'CREATE_FAMILY',name:form.get('name'),description:form.get('description')})});
-      await loadFamilies(); setCurrentId(family.id); setMessage('空白族谱已创建，请添加第一位初始人物。'); event.currentTarget.reset();
-    } catch (error) { setMessage((error as Error).message); }
+      const family = await requestJson<Family>('/api/families',{method:'POST',headers:creationHeaders(crypto.randomUUID()),body:JSON.stringify({action:'CREATE_FAMILY',name:form.get('name'),description:form.get('description')})});
+      startCooldown('CREATE_FAMILY'); await loadFamilies(); setCurrentId(family.id); setMessage('空白族谱已创建，请添加第一位初始人物。'); event.currentTarget.reset();
+    } catch (error) { captureCooldown('CREATE_FAMILY',error); setMessage((error as Error).message); }
   };
   const joinFamily = async (event:FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,15 +129,19 @@ export default function FamilyPortal() {
     event.preventDefault();
     if (!current || !addTarget) return;
     const form = new FormData(event.currentTarget);
+    const actionKey = `${current.id}:${addTarget.direction}:${addTarget.direction==='PARENT'?String(form.get('gender')||''):''}`;
+    if (secondsLeft(actionKey)) return;
     try {
-      await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'ADD_PERSON',familyId:current.id,direction:addTarget.direction,referencePersonId:addTarget.reference?.id,name:form.get('name'),gender:form.get('gender'),birthYear:form.get('birthYear'),biography:form.get('biography')})});
-      setAddTarget(null); await refreshTree(); setMessage('人物已加入，世代编号已自动重新计算。');
-    } catch (error) { setMessage((error as Error).message); }
+      await requestJson('/api/families',{method:'POST',headers:creationHeaders(crypto.randomUUID()),body:JSON.stringify({action:'ADD_PERSON',familyId:current.id,direction:addTarget.direction,referencePersonId:addTarget.reference?.id,name:form.get('name'),gender:form.get('gender'),birthYear:form.get('birthYear'),biography:form.get('biography')})});
+      startCooldown(actionKey); setAddTarget(null); await refreshTree(); setMessage('人物已加入，世代编号已自动重新计算。');
+    } catch (error) { captureCooldown(actionKey,error); setMessage((error as Error).message); }
   };
   const claim = async (personId:string) => {
     if (!current) return;
-    try { await requestJson('/api/families',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'CLAIM_PERSON',familyId:current.id,personId})}); await refreshTree(); setMessage('认领申请已提交，审核通过后才会关联账号。'); }
-    catch (error) { setMessage((error as Error).message); }
+    const actionKey = `${current.id}:SUBMIT_CLAIM`;
+    if (secondsLeft(actionKey)) return;
+    try { await requestJson('/api/families',{method:'POST',headers:creationHeaders(crypto.randomUUID()),body:JSON.stringify({action:'CLAIM_PERSON',familyId:current.id,personId})}); startCooldown(actionKey); await refreshTree(); setMessage('认领申请已提交，审核通过后才会关联账号。'); }
+    catch (error) { captureCooldown(actionKey,error); setMessage((error as Error).message); }
   };
   const manage = async (body:Record<string,unknown>) => {
     if (!current) return;
@@ -139,7 +166,7 @@ export default function FamilyPortal() {
     {familyLoadState==='ready' && current && <iframe title={current.name} src={`/family.html?family_id=${encodeURIComponent(current.id)}`} className="legacy-frame" />}
     {showFamilies && <div className="veil"><section className="family-dialog"><button className="close" onClick={() => setShowFamilies(false)}>×</button><h2>我的族谱</h2><p>一个账号可以加入多本族谱，切换后所有人物与资料互不混用。</p>
       <div className="family-list">{families.map((family) => <article className={family.id===current?.id?'selected':''} key={family.id}><div><strong>{family.name}</strong><small>{roleNames[family.role]} · 加入码 {family.join_code}</small></div><div className="family-row-actions"><button onClick={() => {setCurrentId(family.id);setShowFamilies(false)}}>{family.id===current?.id?'当前':'切换'}</button>{family.role==='OWNER'&&family.source_type!=='LEGACY_STATIC'&&<button className="danger-link" onClick={()=>{setDeleteTarget(family);setDeleteName('')}}>删除</button>}</div></article>)}</div>
-      <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button>创建族谱</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>
+      <div className="family-forms"><form onSubmit={createFamily}><h3>新建空白族谱</h3><input name="name" required placeholder="族谱名称"/><input name="description" placeholder="简介（选填）"/><button disabled={secondsLeft('CREATE_FAMILY')>0}>{secondsLeft('CREATE_FAMILY')>0?`${secondsLeft('CREATE_FAMILY')}秒后可再次创建`:'创建族谱'}</button><small>不会自动生成示例人物。</small></form><form onSubmit={joinFamily}><h3>加入族谱</h3><input name="code" required placeholder="输入8位加入码"/><button>加入族谱</button><small>加入后默认是查看成员。</small></form></div>
       {deleteTarget&&<section className="delete-confirm" role="alertdialog" aria-modal="true" aria-labelledby="delete-family-title"><h3 id="delete-family-title">永久删除“{deleteTarget.name}”？</h3><p>人物、关系、公告、媒体和成员权限都会一并删除，无法恢复。请输入完整族谱名称确认：</p><input value={deleteName} onChange={event=>setDeleteName(event.target.value)} placeholder={deleteTarget.name} autoFocus/><div><button className="cancel-delete" onClick={()=>{setDeleteTarget(null);setDeleteName('')}}>取消</button><button className="confirm-delete" disabled={deleteName!==deleteTarget.name} onClick={deleteSelectedFamily}>确认永久删除</button></div></section>}
     </section></div>}
     {addTarget && <div className="veil"><form className="person-dialog" onSubmit={addPerson}><button type="button" className="close" onClick={() => setAddTarget(null)}>×</button><h2>{directions[addTarget.direction]}</h2>{addTarget.reference && <p>以 <strong>{addTarget.reference.name}</strong> 为参照添加</p>}<label>姓名<input name="name" required autoFocus /></label><label>性别<input name="gender" placeholder="可自由填写" /></label><label>出生年份<input name="birthYear" inputMode="numeric" /></label><label>人物生平<textarea name="biography" rows={4}/></label><button className="submit">保存人物</button></form></div>}
@@ -186,7 +213,7 @@ function AuthScreen({onAuthenticated}:{onAuthenticated:(user:User)=>void}) {
     event.preventDefault(); setError(''); setSubmitting(true);
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {
-      const data = await requestJson<{user:User}>(`/api/auth/${mode}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(values)});
+      const data = await requestJson<{user:User}>(`/api/auth/${mode}`,{method:'POST',headers:mode==='register'?creationHeaders(crypto.randomUUID()):{'content-type':'application/json'},body:JSON.stringify(values)});
       onAuthenticated(data.user);
     } catch (submitError) { setError((submitError as Error).message); }
     finally { setSubmitting(false); }
