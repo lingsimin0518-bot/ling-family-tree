@@ -225,8 +225,17 @@ export async function claimPerson(userId: string, familyId: string, personId: st
   const linked = await db().prepare('SELECT id FROM persons WHERE family_id=? AND linked_user_id=? LIMIT 1').bind(familyId, userId).first();
   if (linked) throw new Response('你在这本族谱中已经认领了本人', { status: 409 });
   const id = crypto.randomUUID();
-  await db().prepare("INSERT INTO person_claims (id,family_id,user_id,person_id,status,created_at) VALUES (?,?,?,?, 'PENDING', ?)").bind(id, familyId, userId, personId, new Date().toISOString()).run();
-  return { id, status: 'PENDING' };
+  const reviewId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const admins = await db().prepare("SELECT user_id FROM family_users WHERE family_id=? AND role IN ('OWNER','ADMIN')").bind(familyId).all<{user_id:string}>();
+  const statements = [
+    db().prepare("INSERT INTO person_claims (id,family_id,user_id,person_id,status,created_at) VALUES (?,?,?,?, 'PENDING', ?)").bind(id, familyId, userId, personId, now),
+    db().prepare("INSERT INTO review_requests (id,family_id,applicant_user_id,request_type,target_id,new_data,reason,status,created_at) VALUES (?,?,?,?,?,?,?,'PENDING',?)").bind(reviewId, familyId, userId, 'CLAIM_PERSON', id, JSON.stringify({ person_id:personId }), '认领本人', now),
+    db().prepare("INSERT INTO user_messages (id,user_id,family_id,message_type,title,content,related_request_id,is_read,created_at) VALUES (?,?,?,?,?,?,?,0,?)").bind(crypto.randomUUID(), userId, familyId, 'REQUEST_SUBMITTED', '认领申请已提交', '认领本人申请已提交管理员审核。', reviewId, now),
+  ];
+  for (const admin of admins.results) if (admin.user_id !== userId) statements.push(db().prepare("INSERT INTO user_messages (id,user_id,family_id,message_type,title,content,related_request_id,is_read,created_at) VALUES (?,?,?,?,?,?,?,0,?)").bind(crypto.randomUUID(), admin.user_id, familyId, 'REVIEW_PENDING', '新的认领申请', '有一条认领本人申请等待审核。', reviewId, now));
+  await db().batch(statements);
+  return { id, reviewId, status: 'PENDING' };
 }
 
 export async function setMemberRole(ownerId: string, familyId: string, targetUserId: string, nextRole: FamilyRole) {
@@ -250,7 +259,14 @@ export async function reviewClaim(reviewerId: string, familyId: string, claimId:
     const target = await db().prepare('SELECT linked_user_id FROM persons WHERE family_id=? AND id=?').bind(familyId, claim.person_id).first<{linked_user_id:string|null}>();
     if (!target || (target.linked_user_id && target.linked_user_id !== claim.user_id)) throw new Response('该人物已被其他用户认领', { status: 409 });
   }
-  const statements = [db().prepare('UPDATE person_claims SET status=? WHERE id=? AND family_id=?').bind(decision, claimId, familyId)];
+  const now = new Date().toISOString();
+  const review = await db().prepare("SELECT id FROM review_requests WHERE family_id=? AND request_type='CLAIM_PERSON' AND target_id=?").bind(familyId, claimId).first<{id:string}>();
+  const reviewId = review?.id ?? `review-claim-${claimId}`;
+  const statements = [
+    db().prepare('UPDATE person_claims SET status=? WHERE id=? AND family_id=?').bind(decision, claimId, familyId),
+    db().prepare("INSERT INTO review_requests (id,family_id,applicant_user_id,reviewer_user_id,request_type,target_id,new_data,reason,status,created_at,reviewed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET reviewer_user_id=excluded.reviewer_user_id,status=excluded.status,reviewed_at=excluded.reviewed_at").bind(reviewId, familyId, claim.user_id, reviewerId, 'CLAIM_PERSON', claimId, JSON.stringify({ person_id:claim.person_id }), '认领本人', decision, now, now),
+    db().prepare("INSERT INTO user_messages (id,user_id,family_id,message_type,title,content,related_request_id,is_read,created_at) VALUES (?,?,?,?,?,?,?,0,?)").bind(crypto.randomUUID(), claim.user_id, familyId, decision === 'APPROVED' ? 'REVIEW_APPROVED' : 'REVIEW_REJECTED', decision === 'APPROVED' ? '认领申请已通过' : '认领申请已驳回', decision === 'APPROVED' ? '你的认领本人申请已通过审核。' : '你的认领本人申请未通过审核。', reviewId, now),
+  ];
   if (decision === 'APPROVED') statements.push(db().prepare('UPDATE persons SET linked_user_id=? WHERE id=? AND family_id=?').bind(claim.user_id, claim.person_id, familyId));
   await db().batch(statements);
   return { claimId, status: decision };

@@ -988,7 +988,7 @@ window.installFamilyFeatures = function (api) {
     const life = el('label','在世状态'); const select = el('select'); select.name = 'lifeStatus'; select.innerHTML = '<option value="unknown">待核实</option><option value="living">在世</option><option value="deceased">已故</option>'; select.value = p.lifeStatus || 'unknown'; life.append(select); extras.append(life);
     const photoLabel = el('label','照片（JPG / PNG / WebP，不超过 5 MB）'); const file = el('input'); file.type = 'file'; file.accept = 'image/jpeg,image/png,image/webp'; photoLabel.append(file); extras.append(photoLabel);
     const preview = el('div'); preview.append(avatar(p)); extras.append(preview);
-    const status = el('p', '修改和照片经审核后显示；当前演示资料仅保留在本次页面会话。'); status.setAttribute('role','status'); extras.append(status);
+    const status = el('p', '人物修改申请会持久保存并等待管理员审核；照片功能仍维持当前实现。'); status.setAttribute('role','status'); extras.append(status);
     const submit = form.querySelector('[type="submit"]');
     file.addEventListener('change', async () => {
       const imageFile = file.files[0]; if (!imageFile) return;
@@ -1061,8 +1061,8 @@ window.installFamilyFeatures = function (api) {
     api.bookCollections.stories = originalBooks.stories.concat(data.people.map(p => ({title:p.name,kicker:`第${p.generation}代 · ${p.synthetic ? '测试资料' : '待核实资料'}`,body:`${parentText(p)}\n配偶：${partnerOf(p)?.name || '未记录'}\n${p.biography}`})));
     tables=buildTables();renderTable();renderMembers();
   }
-  const announcements = [{id:'welcome',familyId:'family-lingshi-existing',title:'【示例公告】家谱资料征集：请核实姓名、亲属关系与人物照片',body:'欢迎族人参与修谱。请在人物详情中提交需要补充的内容，并注明资料来源，由管理员审核。\n这是一条演示公告，可在管理员模式下发布新的家族公告。',date:'2026-09-06',author:'管理员（演示）'}];
-  const activity = [{title:'八代族谱与人物资料整理',body:'族谱已提供八代世系、人物详情和电子书。现有随机测试信息仍需与正式资料区分。',date:'2026-09-06',author:'家谱整理记录'}];
+  let announcements = (data.announcements || []).map(item => ({...item,date:item.created_at,author:item.author_name || '管理员'}));
+  let activity = [];
   const communityPanels = {};
   const announcementDialog = el('dialog'); announcementDialog.className = 'community-dialog'; document.body.append(announcementDialog);
   const composer = el('dialog'); composer.className = 'community-dialog'; document.body.append(composer);
@@ -1072,20 +1072,38 @@ window.installFamilyFeatures = function (api) {
     announcementDialog.replaceChildren(button('关闭',()=>announcementDialog.close()),el('p',`${item.date} · ${item.author}`,'community-meta'),el('h2',item.title),el('p',item.body,'community-body'));
     if (!announcementDialog.open) announcementDialog.showModal();
   }
-  function compose(kind) {
+  async function communityRequest(url, options = {}) {
+    const response = await fetch(url, {credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});
+    const result = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(result.error || `操作失败（${response.status}）`);
+    return result;
+  }
+  async function loadCommunity() {
+    try {
+      const [announcementRows, activityRows] = await Promise.all([
+        communityRequest(`/api/announcements?family_id=${encodeURIComponent(data.familyId)}`),
+        communityRequest(`/api/activities?family_id=${encodeURIComponent(data.familyId)}`)
+      ]);
+      announcements = announcementRows.map(item => ({...item,date:item.created_at,author:item.author_name || '管理员'}));
+      activity = activityRows.map(item => ({...item,date:item.created_at,author:item.author_name || '族人'}));
+      renderCommunity();
+    } catch (error) { document.querySelector('#searchStatus').textContent = error instanceof Error ? error.message : '公告与动态加载失败'; }
+  }
+  function compose(kind, existing = null) {
     if (!api.getRole()) { api.login(); return; }
     if (kind === 'announcements' && api.getRole() !== 'admin') return;
-    composer.replaceChildren(button('关闭',()=>composer.close()),el('h2',kind === 'announcements' ? '发布家族公告' : '分享家族动态'));
-    const form = el('form','','member-form'); form.innerHTML = '<label>标题<input name="title" required maxlength="100"></label><label>正文<textarea name="body" required maxlength="3000" rows="7"></textarea></label><p>当前为演示版，发布内容仅保留在本次页面会话。</p><button type="submit">提交</button>';
-    form.addEventListener('submit', event => {
+    composer.replaceChildren(button('关闭',()=>composer.close()),el('h2',kind === 'announcements' ? (existing ? '修改家族公告' : '发布家族公告') : '分享家族动态'));
+    const form = el('form','','member-form'); form.innerHTML = '<label>标题<input name="title" required maxlength="100"></label><label>正文<textarea name="body" required maxlength="3000" rows="7"></textarea></label><p>内容将保存到当前族谱，刷新或更换设备后仍可查看。</p><button type="submit">提交</button>';
+    if (existing) { form.elements.title.value=existing.title; form.elements.body.value=existing.body; }
+    form.addEventListener('submit', async event => {
       event.preventDefault(); if (!api.getRole() || (kind === 'announcements' && api.getRole() !== 'admin')) { composer.close(); return; }
       const fields = new FormData(form); const title = fields.get('title').trim(), body = fields.get('body').trim(); if (!title || !body) return;
-      const item = {id:`post-${Date.now()}`,title,body,date:new Date().toLocaleString('zh-CN'),author:api.getRole() === 'admin' ? '管理员（演示）' : '族人（演示）'};
-      if (kind === 'announcements') announcements.unshift(item);
-      else if (api.getRole() === 'admin') activity.unshift(item);
-      else api.queueReview({type:'activity',category:'profile',title:`家族动态：${title}`,reason:body,payload:item});
-      composer.close();renderCommunity();
-      if (kind === 'activity' && api.getRole() !== 'admin') communityPanels.activity.prepend(el('p','动态已提交，审核通过后展示。','community-feedback'));
+      try {
+        if (kind === 'announcements') await communityRequest('/api/announcements',{method:existing?'PATCH':'POST',body:JSON.stringify({familyId:data.familyId,id:existing?.id,title,body})});
+        else await communityRequest('/api/activities',{method:'POST',body:JSON.stringify({familyId:data.familyId,title,body})});
+        composer.close(); await loadCommunity();
+        document.querySelector('#searchStatus').textContent = kind === 'announcements' ? '公告已保存。' : '动态已提交，审核通过后公开展示。';
+      } catch (error) { form.querySelector('p').textContent=error instanceof Error ? error.message : '提交失败'; }
     });
     composer.append(form); composer.showModal();
   }
@@ -1099,15 +1117,14 @@ window.installFamilyFeatures = function (api) {
       if (kind === 'announcements' && api.getRole() !== 'admin') panel.append(el('p','公告由管理员发布。','community-meta'));
       const posts = kind === 'announcements' ? announcements : activity;
       if (!posts.length) panel.append(el('p','暂无内容。','empty-state'));
-      posts.forEach(item=>{const card=el('article','','community-card');card.append(el('p',`${item.date} · ${item.author}`,'community-meta'),el('h3',item.title),el('p',item.body,'community-body'));if(kind==='announcements')card.append(button('查看公告',()=>showAnnouncement(item)));panel.append(card);});
+      posts.forEach(item=>{const card=el('article','','community-card');card.append(el('p',`${item.date} · ${item.author}${item.status && item.status !== 'APPROVED' ? ` · ${item.status === 'PENDING' ? '待审核' : '已驳回'}` : ''}`,'community-meta'),el('h3',item.title),el('p',item.body,'community-body'));if(kind==='announcements'){card.append(button('查看公告',()=>showAnnouncement(item)));if(api.getRole()==='admin'){card.append(button('修改',()=>compose('announcements',item)),button('删除',async()=>{if(!confirm(`确认删除公告“${item.title}”？`))return;try{await communityRequest('/api/announcements',{method:'DELETE',body:JSON.stringify({familyId:data.familyId,id:item.id})});await loadCommunity();}catch(error){document.querySelector('#searchStatus').textContent=error instanceof Error?error.message:'删除失败';}}));}}panel.append(card);});
     });
   }
   document.querySelector('#latestAnnouncement').addEventListener('click',()=>showAnnouncement(announcements[0]));
   document.querySelector('#pauseAnnouncement').addEventListener('click',event=>{const node=event.currentTarget;const paused=node.getAttribute('aria-pressed')!=='true';node.setAttribute('aria-pressed',String(paused));node.textContent=paused?'继续滚动':'暂停滚动';document.querySelector('.announcement-ticker').classList.toggle('ticker-paused',paused);});
-  const approveActivity = review => {activity.unshift({...review.payload,date:new Date().toLocaleString('zh-CN')});renderCommunity();};
-  const recordActivity = review => { activity.unshift({title:review.title,body:'人物资料申请已通过管理员审核，族谱已更新。',date:new Date().toLocaleString('zh-CN'),author:'审核记录'});renderCommunity(); };
   renderCommunity();
-  return {avatar,showPerson,parentText,extendEdit,readEdit,genderInput,readGender,render,renderCommunity,approveActivity,recordActivity};
+  void loadCommunity();
+  return {avatar,showPerson,parentText,extendEdit,readEdit,genderInput,readGender,render,renderCommunity,loadCommunity};
 };
 
 </script>
@@ -1294,6 +1311,10 @@ async function loadCurrentFamilyTree() {
       window.NORMALIZED_FAMILY_TREE.familyId = requestedFamilyId;
       window.NORMALIZED_FAMILY_TREE.family = family;
       window.NORMALIZED_FAMILY_TREE.role = payload.role;
+      window.NORMALIZED_FAMILY_TREE.currentUserId = payload.currentUserId;
+      window.NORMALIZED_FAMILY_TREE.announcements = payload.announcements || [];
+      window.NORMALIZED_FAMILY_TREE.claims = payload.claims || [];
+      window.NORMALIZED_FAMILY_TREE.members = payload.members || [];
       return window.NORMALIZED_FAMILY_TREE;
     }
 
@@ -1372,6 +1393,7 @@ async function loadCurrentFamilyTree() {
       members: payload.members || [],
       media: payload.media || [],
       relationships: payload.relationships || [],
+      announcements: payload.announcements || [],
       people,
       unions,
       metadata: {
@@ -1468,10 +1490,7 @@ async function loadCurrentFamilyTree() {
   let lastViewedPerson = null;
   let currentRole = null;
   let reviewFilter = "all";
-  let pendingReviews = [
-    { id: "demo-registration", type: "registration", category: "registration", title: "族人注册：凌某（演示）", submittedAt: "2026/9/5 19:30", reason: "邀请码：LS-2026；申请加入第三代成员可见范围。" },
-    { id: "demo-profile", type: "profile", category: "profile", title: "资料补充：家族往事（演示）", submittedAt: "2026/9/5 19:42", reason: "补充人物职业和生平资料，来源为本人填写。" }
-  ];
+  let pendingReviews = [];
   let treeZoom = 1;
   let canvasLocked = false;
   let isRightDragging = false;
@@ -2114,21 +2133,36 @@ async function loadCurrentFamilyTree() {
     return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
   }
 
-  function queueReview(review) {
+  async function queueReview(review) {
     if (review.type === 'edit') {
       const original = peopleById.get(review.personId);
       review.before = Object.fromEntries(Object.keys(review.patch).map(key => [key, original?.[key] ?? (key === 'lifeStatus' ? 'unknown' : '')]));
       review.patch = Object.fromEntries(Object.entries(review.patch).filter(([key,value]) => String(value ?? '') !== String(review.before[key])));
       if (!Object.keys(review.patch).length) { actionStatus.textContent = '未检测到资料变化，无需提交审核。'; return; }
     }
-    pendingReviews.push({ id: `review-${Date.now()}-${pendingReviews.length}`, category: "profile", submittedAt: new Date().toLocaleString("zh-CN"), ...review });
-    updateReviewBadge();
-    actionStatus.textContent = "申请已提交，等待管理员审核。";
+    try {
+      const response = await fetch('/api/reviews',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'SUBMIT_PERSON',familyId:data.familyId,requestType:review.type==='edit'?'UPDATE_PERSON':'CREATE_PERSON',targetId:review.personId||null,oldData:review.before||null,newData:review.patch||review.payload||null,reason:review.reason})});
+      const result = await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(result.error||`提交失败（${response.status}）`);
+      actionStatus.textContent = "申请已提交，等待管理员审核。";
+      await loadReviews();
+    } catch(error) { actionStatus.textContent=error instanceof Error?error.message:'申请提交失败'; }
+  }
+
+  async function loadReviews() {
+    try {
+      const response=await fetch(`/api/reviews?family_id=${encodeURIComponent(data.familyId)}`,{credentials:'same-origin'});
+      const rows=await response.json(); if(!response.ok)throw new Error(rows.error||'审核记录加载失败');
+      const labels={CLAIM_PERSON:'认领本人',CREATE_PERSON:'新增人物',UPDATE_PERSON:'修改人物资料',FAMILY_ACTIVITY:'家族动态'};
+      pendingReviews=rows.map(row=>({id:row.id,claimId:row.request_type==='CLAIM_PERSON'?row.target_id:null,type:({CREATE_PERSON:'add',UPDATE_PERSON:'edit',FAMILY_ACTIVITY:'activity',CLAIM_PERSON:'claim'})[row.request_type],category:row.request_type==='CLAIM_PERSON'?'registration':'profile',title:`${labels[row.request_type]||row.request_type} · ${row.applicant_name||'族人'}`,submittedAt:row.created_at,reason:row.reason,status:row.status,patch:row.new_data?JSON.parse(row.new_data):null,before:row.old_data?JSON.parse(row.old_data):null}));
+      updateReviewBadge();
+    } catch(error){actionStatus.textContent=error instanceof Error?error.message:'审核记录加载失败';}
   }
 
   function updateReviewBadge() {
-    reviewCount.textContent = pendingReviews.length;
-    reviewCount.classList.toggle("empty", pendingReviews.length === 0);
+    const count=pendingReviews.filter(item=>item.status==='PENDING').length;
+    reviewCount.textContent = count;
+    reviewCount.classList.toggle("empty", count === 0);
   }
 
   function openEditDialog() {
@@ -2236,55 +2270,17 @@ async function loadCurrentFamilyTree() {
     addDialog.showModal();
   }
 
-  function approveReview(review) {
-    if (currentRole !== 'admin') return;
-    let approvedPersonId = null;
-    if (review.type === 'activity') {
-      features.approveActivity(review);
-    } else if (review.type === "registration" || review.type === "profile") {
-      approvedPersonId = null;
-    } else if (review.type === "edit") {
-      const person = peopleById.get(review.personId);
-      if (person) Object.assign(person, review.patch);
-    } else {
-      const parent = peopleById.get(review.payload.parentId);
-      const parentUnion = unionByPersonId.get(parent.id);
-      const partner = partnerOf(parent);
-      const father = parent.gender === "男" ? parent : partner && partner.gender === "男" ? partner : null;
-      const mother = parent.gender === "女" ? parent : partner && partner.gender === "女" ? partner : null;
-      const person = {
-        id: `approved-person-${Date.now()}`,
-        name: review.payload.name,
-        gender: review.payload.gender,
-        generation: parent.generation + 1,
-        lineage: review.payload.name.startsWith("凌") ? "ling" : "external",
-        synthetic: false,
-        birthYear: review.payload.birthYear,
-        occupation: review.payload.occupation,
-        biography: review.payload.biography,
-        fatherId: father ? father.id : null,
-        motherId: mother ? mother.id : null
-      };
-      data.people.push(person);
-      peopleById.set(person.id, person);
-      approvedPersonId = person.id;
-      if (parentUnion) parentUnion.childrenIds.push(person.id);
-      if (review.payload.spouseName) {
-        const spouse = { id: `approved-spouse-${Date.now()}`, name: review.payload.spouseName, gender: person.gender === "男" ? "女" : person.gender === '女' ? '男' : '待核实', generation: person.generation, lineage: "external", synthetic: false, birthYear: "未记录", occupation: "未记录", biography: "生平资料暂未收集。", fatherId: null, motherId: null };
-        const union = { id: `approved-union-${Date.now()}`, partnerAId: person.id, partnerBId: spouse.id, childrenIds: [] };
-        data.people.push(spouse); peopleById.set(spouse.id, spouse); data.unions.push(union); unionByPersonId.set(person.id, union); unionByPersonId.set(spouse.id, union);
+  async function decideReview(review, decision) {
+    if (currentRole !== 'admin' || review.status !== 'PENDING') return;
+    try {
+      if(review.type==='claim') await familyAction('REVIEW_CLAIM',{claimId:review.claimId,decision});
+      else {
+        const response=await fetch('/api/reviews',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'REVIEW',familyId:data.familyId,requestId:review.id,decision})});
+        const result=await response.json().catch(()=>({})); if(!response.ok)throw new Error(result.error||'审核失败');
       }
-    }
-    pendingReviews = pendingReviews.filter((item) => item.id !== review.id);
-    if (review.type === 'add' || review.type === 'edit') features.recordActivity(review);
-    updateReviewBadge();
-    renderTree();
-    generationSelect.value = '';
-    document.querySelector('#showFullTreeButton').classList.add('active');
-    renderReviews();
-    actionStatus.textContent = "管理员已批准，族谱已更新。";
-    reviewDialog.close();
-    if (approvedPersonId) window.setTimeout(() => focusPerson(approvedPersonId), 120);
+      await loadReviews(); if(features?.loadCommunity)await features.loadCommunity(); renderReviews();
+      actionStatus.textContent=decision==='APPROVED'?'审核已通过。':'审核已驳回。';
+    }catch(error){actionStatus.textContent=error instanceof Error?error.message:'审核失败';}
   }
 
   function renderReviews() {
@@ -2297,7 +2293,7 @@ async function loadCurrentFamilyTree() {
     visibleReviews.forEach((review) => {
       const item = document.createElement("article");
       item.className = "review-item";
-      item.innerHTML = `<div><strong>${escapeHtml(review.title)}</strong><small>${escapeHtml(review.submittedAt)}</small><p>${escapeHtml(review.reason || "未填写原因")}</p></div><div class="review-actions"><button type="button" data-action="approve">批准</button><button type="button" data-action="reject" class="secondary-action">驳回</button></div>`;
+      item.innerHTML = `<div><strong>${escapeHtml(review.title)}</strong><small>${escapeHtml(review.submittedAt)} · ${review.status==='PENDING'?'待审核':review.status==='APPROVED'?'已通过':'已驳回'}</small><p>${escapeHtml(review.reason || "未填写原因")}</p></div><div class="review-actions">${review.status==='PENDING'?'<button type="button" data-action="approve">批准</button><button type="button" data-action="reject" class="secondary-action">驳回</button>':''}</div>`;
       if (review.patch) {
         const preview = document.createElement('details');
         const summary = document.createElement('summary'); summary.textContent = '查看提交的资料'; preview.append(summary);
@@ -2315,8 +2311,8 @@ async function loadCurrentFamilyTree() {
         if (review.patch.photo && features) preview.append(features.avatar({ name:review.title,photo:review.patch.photo }));
         item.firstElementChild.append(preview);
       }
-      item.querySelector('[data-action="approve"]').addEventListener("click", () => approveReview(review));
-      item.querySelector('[data-action="reject"]').addEventListener("click", () => { pendingReviews = pendingReviews.filter((entry) => entry.id !== review.id); updateReviewBadge(); renderReviews(); actionStatus.textContent = "管理员已驳回申请。"; });
+      item.querySelector('[data-action="approve"]')?.addEventListener("click", () => void decideReview(review,'APPROVED'));
+      item.querySelector('[data-action="reject"]')?.addEventListener("click", () => void decideReview(review,'REJECTED'));
       reviewList.appendChild(item);
     });
   }
@@ -2334,7 +2330,7 @@ async function loadCurrentFamilyTree() {
     reviewList.replaceChildren();
     const heading = document.createElement('p');
     heading.className = 'detail-note';
-    heading.textContent = `当前族谱成员 ${data.members?.length || 0} 人；待处理认领 ${data.claims?.filter(item => item.status === 'PENDING').length || 0} 条。`;
+    heading.textContent = `当前族谱成员 ${data.members?.length || 0} 人；待审核申请 ${pendingReviews.filter(item => item.status === 'PENDING').length} 条。`;
     reviewList.append(heading);
     (data.members || []).forEach(member => {
       const row = document.createElement('article'); row.className = 'review-item';
@@ -2349,11 +2345,11 @@ async function loadCurrentFamilyTree() {
       }
       reviewList.append(row);
     });
-    (data.claims || []).filter(item => item.status === 'PENDING').forEach(claim => {
+    pendingReviews.filter(item => item.status === 'PENDING').forEach(review => {
       const row=document.createElement('article'); row.className='review-item';
-      row.innerHTML=`<div><strong>${escapeHtml(claim.user_name || '族人')} 申请认领 ${escapeHtml(claim.person_name || '人物')}</strong><small>${escapeHtml(claim.created_at || '')}</small></div>`;
+      row.innerHTML=`<div><strong>${escapeHtml(review.title)}</strong><small>${escapeHtml(review.submittedAt || '')}</small><p>${escapeHtml(review.reason || '')}</p></div>`;
       const actions=document.createElement('div'); actions.className='review-actions';
-      ['APPROVED','REJECTED'].forEach(decision => { const button=document.createElement('button'); button.type='button'; button.textContent=decision === 'APPROVED' ? '通过' : '驳回'; button.addEventListener('click',()=>void runFamilyAction('REVIEW_CLAIM',{claimId:claim.id,decision},decision === 'APPROVED' ? '认领已通过。' : '认领已驳回。')); actions.append(button); });
+      ['APPROVED','REJECTED'].forEach(decision => { const button=document.createElement('button'); button.type='button'; button.textContent=decision === 'APPROVED' ? '通过' : '驳回'; button.addEventListener('click',()=>void decideReview(review,decision)); actions.append(button); });
       row.append(actions); reviewList.append(row);
     });
     reviewDialog.showModal();
@@ -2411,7 +2407,7 @@ async function loadCurrentFamilyTree() {
   document.querySelector("#privacyButton").addEventListener("click", () => privacyDialog.showModal());
   document.querySelector("#addMemberButton").addEventListener("click", openAddDialog);
   document.querySelector("#editMemberButton").addEventListener("click", openEditDialog);
-  reviewButton.addEventListener("click", () => { if (currentRole !== "admin") return; if (isDatabaseFamily) renderDatabaseManagement(); else { renderReviews(); reviewDialog.showModal(); } });
+  reviewButton.addEventListener("click", async () => { if (currentRole !== "admin") return; await loadReviews(); if (isDatabaseFamily) renderDatabaseManagement(); else { renderReviews(); reviewDialog.showModal(); } });
   loginButton.addEventListener("click", () => loginDialog.showModal());
   function activateView(view) {
     document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
@@ -2508,15 +2504,16 @@ async function loadCurrentFamilyTree() {
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach((dialog) => dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); }));
   features = window.installFamilyFeatures({ data, peopleById, partnerOf, childrenOf, showPerson, openEditDialog, openPersistentAdd, claimPerson:claimDatabasePerson, canEditPerson, canAddPeople, isDatabaseFamily, queueReview, getRole: () => currentRole, login: () => loginDialog.showModal(), bookCollections, renderTree });
-  if (isDatabaseFamily) {
-    currentRole = canManageAll ? 'admin' : data.role === 'EDITOR' ? 'member' : 'viewer';
-    actionBar.hidden = data.role === 'VIEWER';
-    accountLabel.textContent = `${data.role} · 已登录`;
-    loginButton.hidden = true;
-    reviewButton.hidden = !canManageAll;
-    actionStatus.textContent = data.role === 'VIEWER' ? '当前为只读权限。' : '人物与关系修改将保存到当前族谱。';
-  }
-  updateReviewBadge();
+  currentRole = canManageAll ? 'admin' : data.role === 'EDITOR' ? 'member' : 'viewer';
+  actionBar.hidden = data.role === 'VIEWER';
+  accountLabel.textContent = `${data.role} · 已登录`;
+  loginButton.hidden = true;
+  reviewButton.hidden = !canManageAll;
+  actionStatus.textContent = data.role === 'VIEWER' ? '当前为只读权限。' : isDatabaseFamily ? '人物与关系修改将保存到当前族谱。' : '静态人物新增/修改申请将保存审核记录，暂不覆盖静态人物源。';
+  const messageDialog=document.createElement('dialog');messageDialog.className='review-dialog';document.body.append(messageDialog);
+  const messageButton=document.createElement('button');messageButton.type='button';messageButton.textContent='站内消息';document.querySelector('.toolbar > div').append(messageButton);
+  messageButton.addEventListener('click',async()=>{messageDialog.innerHTML='<button type="button">关闭</button><h2>站内消息</h2><div>正在加载…</div>';messageDialog.querySelector('button').addEventListener('click',()=>messageDialog.close());messageDialog.showModal();try{const response=await fetch(`/api/messages?family_id=${encodeURIComponent(data.familyId)}`,{credentials:'same-origin'});const rows=await response.json();if(!response.ok)throw new Error(rows.error||'消息加载失败');const box=messageDialog.querySelector('div');box.replaceChildren();if(!rows.length)box.textContent='暂无消息。';rows.forEach(item=>{const card=document.createElement('article');card.className='review-item';card.innerHTML=`<div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.created_at)}${item.is_read?' · 已读':' · 未读'}</small><p>${escapeHtml(item.content)}</p></div>`;if(!item.is_read){const read=document.createElement('button');read.textContent='标为已读';read.addEventListener('click',async()=>{await fetch('/api/messages',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({familyId:data.familyId,messageId:item.id})});read.remove();});card.append(read);}box.append(card);});}catch(error){messageDialog.querySelector('div').textContent=error instanceof Error?error.message:'消息加载失败';}});
+  await loadReviews();
   renderTree();
 })();
 
