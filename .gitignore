@@ -36,6 +36,9 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/backups/
+production-before-*.zip
+*.production-backup.zip
 
 # Unrelated paused Java migration prototype; never publish with the Worker site.
 /backend-java/
