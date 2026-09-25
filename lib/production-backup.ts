@@ -139,13 +139,6 @@ async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) 
     }
   }
 
-  if (
-    schemaNames.has('family_activities') &&
-    schemaNames.has('review_requests') &&
-    schemaNames.has('user_messages')
-  ) {
-    return '0006';
-  }
   if (schemaNames.has('action_rate_limit') && schemaNames.has('action_idempotency')) {
     return '0005';
   }
