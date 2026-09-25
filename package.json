@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
+    "backup:verify": "node scripts/backup/verify-and-restore.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
   },
