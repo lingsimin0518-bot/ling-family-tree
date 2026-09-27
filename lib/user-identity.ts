@@ -73,6 +73,20 @@ export function normalizePhoneToE164(input: string, region?: PhoneRegion) {
   return `+81${source.slice(1)}`;
 }
 
+export function normalizeMainlandChinaPhone(input: string) {
+  const source = cleanDigits(input.trim());
+  if (!/^1[3-9]\d{9}$/.test(source)) {
+    throw new Error('请输入11位中国大陆手机号');
+  }
+  return normalizePhoneToE164(source, 'CN');
+}
+
+export function maskMainlandChinaPhone(phoneE164: string) {
+  const normalized = normalizePhoneToE164(phoneE164);
+  if (!/^\+861[3-9]\d{9}$/.test(normalized)) throw new Error('中国大陆手机号格式不正确');
+  return `${normalized.slice(3, 6)}****${normalized.slice(-4)}`;
+}
+
 function mapIdentity(row: IdentityRow | null): UserIdentity | null {
   if (!row) return null;
   return {

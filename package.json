@@ -12,6 +12,7 @@
     "backup:verify": "node scripts/backup/verify-and-restore.mjs",
     "backup:test-fixture": "node --experimental-strip-types scripts/backup/create-local-test-backup.mjs",
     "test:auth-foundation": "node --experimental-strip-types scripts/auth/test-auth-foundation.mjs",
+    "test:phone-auth": "node scripts/phone-auth/test-phone-auth.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
   },

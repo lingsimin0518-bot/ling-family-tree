@@ -79,6 +79,18 @@ export const actionRateLimits = sqliteTable('action_rate_limit', {
   uniqueIndex('idx_action_rate_limit_scope').on(t.actorKey,t.familyKey,t.actionType),
   index('idx_action_rate_limit_success').on(t.lastSuccessAt),
 ]);
+export const phoneChangeChallenges = sqliteTable('phone_change_challenges', {
+  id:text('id').primaryKey(),
+  userId:text('user_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  oldPhoneE164:text('old_phone_e164').notNull(),
+  tokenHash:text('token_hash').notNull(),
+  expiresAt:text('expires_at').notNull(),
+  usedAt:text('used_at'),
+  createdAt:text('created_at').notNull(),
+}, t=>[
+  uniqueIndex('idx_phone_change_challenges_token').on(t.tokenHash),
+  index('idx_phone_change_challenges_user_created').on(t.userId,t.createdAt),
+]);
 
 export const actionIdempotency = sqliteTable('action_idempotency', {
   id:text('id').primaryKey(),

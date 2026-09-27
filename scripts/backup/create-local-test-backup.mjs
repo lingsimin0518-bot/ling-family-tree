@@ -16,6 +16,7 @@ const TABLES = [
   'generations',
   'media',
   'person_claims',
+  'phone_change_challenges',
   'persons',
   'relationships',
   'review_requests',
@@ -35,6 +36,7 @@ const MIGRATIONS = [
   '0005_creation_cooldown.sql',
   '0006_collaboration_persistence.sql',
   '0007_auth_identity_foundation.sql',
+  '0008_phone_change_challenges.sql',
 ];
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const encoder = new TextEncoder();
@@ -77,7 +79,7 @@ function sha256(bytes) {
 }
 
 async function main() {
-  const work = await mkdtemp(join(tmpdir(), 'backup-18-table-fixture-'));
+  const work = await mkdtemp(join(tmpdir(), 'backup-19-table-fixture-'));
   const state = join(work, 'state');
   const config = join(work, 'wrangler.jsonc');
   await writeFile(
@@ -139,13 +141,13 @@ async function main() {
   }
 
   const schemaJson = jsonBytes({
-    schema_version: '0007',
+    schema_version: '0008',
     tables: schemaTables,
     sqlite_schema: schemaRows.filter(
       (entry) => TABLES.includes(entry.table_name) || TABLES.includes(entry.name),
     ),
   });
-  const schemaReadme = encoder.encode('本地18表备份恢复测试数据，不含生产信息。\n');
+  const schemaReadme = encoder.encode('本地19表备份恢复测试数据，不含生产信息。\n');
   const checksums = {};
   for (const file of [...tableFiles, { path: 'schema/schema.json', bytes: schemaJson }]) {
     checksums[file.path] = sha256(file.bytes);
@@ -154,7 +156,7 @@ async function main() {
   const now = new Date().toISOString();
   const manifest = {
     backup_format_version: 1,
-    schema_version: '0007',
+    schema_version: '0008',
     export_started_at: now,
     export_finished_at: now,
     project_id: 'appgprj_6a9b746cbba88191bd63914f864ffb5e',
@@ -169,7 +171,7 @@ async function main() {
     ...tableFiles,
   ];
   const zip = createStoredZipStream(files);
-  const zipPath = join(work, 'local-0007-18-table-backup.zip');
+  const zipPath = join(work, 'local-0008-19-table-backup.zip');
   await writeFile(zipPath, new Uint8Array(await new Response(zip).arrayBuffer()));
   console.log(zipPath);
 }

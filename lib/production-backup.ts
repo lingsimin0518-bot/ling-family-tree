@@ -12,6 +12,7 @@ export const PRODUCTION_BACKUP_TABLES = [
   'generations',
   'media',
   'person_claims',
+  'phone_change_challenges',
   'persons',
   'relationships',
   'review_requests',
@@ -142,6 +143,10 @@ async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) 
       const match = row?.name?.match(/^(\d{4})/);
       if (match) return match[1];
     }
+  }
+
+  if (schemaNames.has('phone_change_challenges')) {
+    return '0008';
   }
 
   if (

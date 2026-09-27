@@ -15,6 +15,7 @@ const TABLES = [
   'generations',
   'media',
   'person_claims',
+  'phone_change_challenges',
   'persons',
   'relationships',
   'review_requests',
@@ -29,6 +30,7 @@ const IMPORT_ORDER = [
   'users',
   'user_identities',
   'sms_verifications',
+  'phone_change_challenges',
   'families',
   'family_users',
   'generations',
@@ -194,17 +196,17 @@ async function main() {
     manifest.backup_format_version !== 1 ||
     manifest.project_id !== 'appgprj_6a9b746cbba88191bd63914f864ffb5e' ||
     manifest.binding !== 'DB' ||
-    manifest.schema_version !== '0007' ||
+    manifest.schema_version !== '0008' ||
     !Array.isArray(manifest.tables)
   ) {
-    fail('manifest 与当前 0007 认证基础结构备份要求不匹配');
+    fail('manifest 与当前 0008 手机号认证结构备份要求不匹配');
   }
   const manifestTables = manifest.tables.map((entry) => entry.table_name);
   if (
     manifestTables.length !== TABLES.length ||
     TABLES.some((table) => !manifestTables.includes(table))
   ) {
-    fail('manifest 没有完整列出18张表');
+    fail('manifest 没有完整列出19张表');
   }
 
   const checksums = parseJson(files, 'checksums.json');
@@ -244,7 +246,7 @@ async function main() {
     '--persist-to',
     state,
   ];
-  for (let version = 0; version <= 7; version += 1) {
+  for (let version = 0; version <= 8; version += 1) {
     const prefix = String(version).padStart(4, '0');
     const migration = [
       '0000_multi_family.sql',
@@ -255,6 +257,7 @@ async function main() {
       '0005_creation_cooldown.sql',
       '0006_collaboration_persistence.sql',
       '0007_auth_identity_foundation.sql',
+      '0008_phone_change_challenges.sql',
     ][version];
     if (!migration.startsWith(prefix)) fail('migration 顺序配置错误');
     runWrangler([...baseArgs, '--file', join(projectRoot, 'drizzle', migration)]);
@@ -290,7 +293,7 @@ async function main() {
     console.log(`${result.pass ? 'PASS' : 'FAIL'} ${result.table}: ${result.actual}/${result.expected}`);
   }
   if (results.some((result) => !result.pass)) fail('一个或多个表的行数不一致');
-  console.log('PASS：备份结构、校验和、本地恢复、18张表行数和外键检查全部通过。');
+  console.log('PASS：备份结构、校验和、本地恢复、19张表行数和外键检查全部通过。');
   console.log(`隔离的本地验证目录：${work}`);
 }
 

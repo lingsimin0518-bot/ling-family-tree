@@ -16,7 +16,7 @@ export type AuthUser = {
   systemRole: 'USER' | 'SUPER_ADMIN';
 };
 
-function db() {
+export function authDb() {
   const binding = (env as unknown as { DB?: D1Database }).DB;
   if (!binding) throw new Error('族谱数据库尚未绑定');
   return binding;
@@ -81,7 +81,7 @@ function parseCookies(request: Request) {
   return result;
 }
 
-function publicUser(row: Record<string, unknown>): AuthUser {
+export function publicAuthUser(row: Record<string, unknown>): AuthUser {
   return {
     id:toText(row.id),
     username:toText(row.username),
@@ -105,6 +105,12 @@ function normalizePhone(value: unknown) {
   return prefix + source.replace(/\D/g, '');
 }
 
+export function validateAccountPassword(password: string) {
+  if (password.length < 8 || password.length > 128) {
+    throw new Response('密码长度需要为8至128个字符', { status: 400 });
+  }
+}
+
 function validateRegistration(input: Record<string,unknown>) {
   const username = toText(input.username).trim();
   const password = toText(input.password);
@@ -114,7 +120,7 @@ function validateRegistration(input: Record<string,unknown>) {
   const phone = normalizePhone(rawPhone);
   if (username.length < 1 || username.length > 32) throw new Response('用户名长度需要为1至32个字符', {status:400});
   if (!/^[\p{L}\p{N}_]+$/u.test(username)) throw new Response('用户名只能包含中文、字母、数字或下划线', {status:400});
-  if (password.length < 8 || password.length > 128) throw new Response('密码长度需要为8至128个字符', {status:400});
+  validateAccountPassword(password);
   if (password !== confirmPassword) throw new Response('两次输入的密码不一致', {status:400});
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Response('邮箱格式不正确', {status:400});
   if (rawPhone && (!/^\+?[0-9][0-9\s()-]{5,24}$/.test(rawPhone) || !/^\+?\d{6,20}$/.test(phone))) throw new Response('手机号格式不正确', {status:400});
@@ -130,14 +136,14 @@ function registrationConflictMessage(error: unknown) {
   return '';
 }
 
-async function createSession(userId: string, request: Request) {
+export async function createAuthSession(userId: string, request: Request) {
   const token = randomToken();
   const id = await sha256(token);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000).toISOString();
-  await db().batch([
-    db().prepare('DELETE FROM user_sessions WHERE expires_at<=?').bind(now.toISOString()),
-    db().prepare('INSERT INTO user_sessions (id,user_id,expires_at,created_at,last_seen_at,user_agent) VALUES (?,?,?,?,?,?)')
+  await authDb().batch([
+    authDb().prepare('DELETE FROM user_sessions WHERE expires_at<=?').bind(now.toISOString()),
+    authDb().prepare('INSERT INTO user_sessions (id,user_id,expires_at,created_at,last_seen_at,user_agent) VALUES (?,?,?,?,?,?)')
       .bind(id,userId,expiresAt,now.toISOString(),now.toISOString(),(request.headers.get('user-agent') ?? '').slice(0,255)),
   ]);
   return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`;
@@ -145,7 +151,7 @@ async function createSession(userId: string, request: Request) {
 
 export async function registerUser(input: Record<string,unknown>, request: Request) {
   const values = validateRegistration(input);
-  const binding = db();
+  const binding = authDb();
   const usernameMatch = await binding.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE').bind(values.username).first();
   if (usernameMatch) throw new Response('该用户名已被使用', {status:409});
   if (values.phone) {
@@ -174,20 +180,20 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
   }
   const row = await binding.prepare('SELECT id,username,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE id=?').bind(id).first<Record<string,unknown>>();
   if (!row) throw new Error('注册完成后无法读取账号');
-  return {user:publicUser(row),cookie:await createSession(id,request)};
+  return {user:publicAuthUser(row),cookie:await createAuthSession(id,request)};
 }
 
 export async function loginUser(input: Record<string,unknown>, request: Request) {
   const username = toText(input.username).trim();
   const password = toText(input.password);
   if (!username || !password) throw new Response('请输入用户名和密码', {status:400});
-  const row = await db().prepare('SELECT id,username,password_hash,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE username=? COLLATE NOCASE')
+  const row = await authDb().prepare('SELECT id,username,password_hash,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE username=? COLLATE NOCASE')
     .bind(username).first<Record<string,unknown>>();
   if (!row || !row.password_hash || !(await verifyPassword(password,toText(row.password_hash)))) throw new Response('用户名或密码不正确', {status:401});
   if (toText(row.status ?? 'ACTIVE') !== 'ACTIVE') throw new Response('该账号当前不可登录，请联系管理员', {status:403});
   const loginTime = new Date().toISOString();
-  await db().prepare('UPDATE users SET last_login_at=?,updated_at=? WHERE id=?').bind(loginTime,loginTime,toText(row.id)).run();
-  return {user:publicUser(row),cookie:await createSession(toText(row.id),request)};
+  await authDb().prepare('UPDATE users SET last_login_at=?,updated_at=? WHERE id=?').bind(loginTime,loginTime,toText(row.id)).run();
+  return {user:publicAuthUser(row),cookie:await createAuthSession(toText(row.id),request)};
 }
 
 export async function getSessionUser(request: Request) {
@@ -195,12 +201,12 @@ export async function getSessionUser(request: Request) {
   if (!token) return null;
   const id = await sha256(token);
   const now = new Date().toISOString();
-  const row = await db().prepare(`SELECT u.id,u.username,u.email,u.phone,u.nickname,u.avatar,u.status,u.system_role,u.display_name
+  const row = await authDb().prepare(`SELECT u.id,u.username,u.email,u.phone,u.nickname,u.avatar,u.status,u.system_role,u.display_name
     FROM user_sessions s JOIN users u ON u.id=s.user_id
     WHERE s.id=? AND s.expires_at>? AND u.status='ACTIVE'`).bind(id,now).first<Record<string,unknown>>();
   if (!row) return null;
-  await db().prepare('UPDATE user_sessions SET last_seen_at=? WHERE id=?').bind(now,id).run();
-  return publicUser(row);
+  await authDb().prepare('UPDATE user_sessions SET last_seen_at=? WHERE id=?').bind(now,id).run();
+  return publicAuthUser(row);
 }
 
 export async function requireUser(request: Request) {
@@ -217,6 +223,6 @@ export async function requireSuperAdmin(request: Request) {
 
 export async function logoutUser(request: Request) {
   const token = parseCookies(request).get(SESSION_COOKIE);
-  if (token) await db().prepare('DELETE FROM user_sessions WHERE id=?').bind(await sha256(token)).run();
+  if (token) await authDb().prepare('DELETE FROM user_sessions WHERE id=?').bind(await sha256(token)).run();
   return `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
