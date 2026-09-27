@@ -7,13 +7,18 @@ export const PRODUCTION_BACKUP_TABLES = [
   'action_rate_limit',
   'announcements',
   'families',
+  'family_activities',
   'family_users',
   'generations',
   'media',
   'person_claims',
   'persons',
   'relationships',
+  'review_requests',
+  'sms_verifications',
   'system_audit_logs',
+  'user_identities',
+  'user_messages',
   'user_sessions',
   'users',
 ] as const;
@@ -137,6 +142,13 @@ async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) 
       const match = row?.name?.match(/^(\d{4})/);
       if (match) return match[1];
     }
+  }
+
+  if (
+    schemaNames.has('user_identities') &&
+    schemaNames.has('sms_verifications')
+  ) {
+    return '0007';
   }
 
   if (
