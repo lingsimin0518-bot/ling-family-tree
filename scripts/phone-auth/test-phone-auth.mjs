@@ -27,7 +27,7 @@ function run(args) {
   return result.stdout;
 }
 const d1 = ['d1','execute','phone-auth-test','--local','--config',config,'--persist-to',state];
-for (const file of ['0000_multi_family.sql','0001_real_user_auth.sql','0002_wechat_identity.sql','0003_system_admin.sql','0004_unified_person_operations.sql','0005_creation_cooldown.sql','0006_collaboration_persistence.sql','0007_auth_identity_foundation.sql','0008_phone_change_challenges.sql']) {
+for (const file of ['0000_multi_family.sql','0001_real_user_auth.sql','0002_wechat_identity.sql','0003_system_admin.sql','0004_unified_person_operations.sql','0005_creation_cooldown.sql','0006_collaboration_persistence.sql','0007_auth_identity_foundation.sql','0008_phone_change_challenges.sql','0009_aliyun_sms_provider.sql']) {
   run([...d1,'--file',join(root,'drizzle',file)]);
 }
 
@@ -109,6 +109,9 @@ try{
   server.stderr.destroy();
   server.unref();
 }
+run([...d1,'--file',join(root,'db','rollback','0009_aliyun_sms_provider.rollback.sql')]);
+const providerColumnCheck=sql("SELECT COUNT(*) total FROM pragma_table_info('sms_verifications') WHERE name='provider'");
+ok(providerColumnCheck.includes('"total": 0')||providerColumnCheck.includes('"total":0'),'0009 rollback');
 run([...d1,'--file',join(root,'db','rollback','0008_phone_change_challenges.rollback.sql')]);
 const rollbackCheck=sql("SELECT COUNT(*) total FROM sqlite_schema WHERE type='table' AND name='phone_change_challenges'");
 ok(rollbackCheck.includes('"total": 0')||rollbackCheck.includes('"total":0'),'0008 rollback');

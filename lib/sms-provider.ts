@@ -5,6 +5,9 @@ import {
   type SmsVerificationPurpose,
   verifyAndConsumeSmsVerification,
 } from './sms-verification';
+import { AliyunSmsAuthenticationProvider } from './aliyun-sms-authentication';
+import { assertSmsSendAllowed, SmsProviderError, type SmsVerificationProvider } from './sms-provider-shared';
+export { SmsProviderError, type SmsSendResult, type SmsVerificationProvider } from './sms-provider-shared';
 
 const MOCK_CODES: Record<string, string> = {
   '+8613800138000': '123456',
@@ -16,28 +19,23 @@ type SmsEnvironment = {
   SMS_MODE?: string;
   APP_ENV?: string;
   SMS_CODE_PEPPER?: string;
+  ALIYUN_SMS_ACCESS_KEY_ID?: string;
+  ALIYUN_SMS_ACCESS_KEY_SECRET?: string;
+  ALIYUN_SMS_ENDPOINT?: string;
+  ALIYUN_SMS_REGION_ID?: string;
+  ALIYUN_SMS_SIGNATURE?: string;
+  ALIYUN_SMS_TEMPLATE_REGISTER?: string;
+  ALIYUN_SMS_TEMPLATE_LOGIN?: string;
+  ALIYUN_SMS_TEMPLATE_RESET_PASSWORD?: string;
+  ALIYUN_SMS_TEMPLATE_BIND_PHONE?: string;
+  ALIYUN_SMS_TEMPLATE_CHANGE_PHONE?: string;
 };
 
-export interface SmsVerificationProvider {
-  sendCode(input: {
-    db: D1Database;
-    phoneE164: string;
-    purpose: SmsVerificationPurpose;
-    requestedIpHash: string;
-    now?: Date;
-  }): Promise<{ cooldownSeconds: number; expiresInSeconds: number }>;
-  verifyCode(input: {
-    db: D1Database;
-    phoneE164: string;
-    purpose: SmsVerificationPurpose;
-    code: string;
-    now?: Date;
-  }): Promise<void>;
-}
 
 function smsEnvironment() {
   return env as unknown as SmsEnvironment;
 }
+
 
 export function assertSmsPurpose(value: unknown): SmsVerificationPurpose {
   if (typeof value !== 'string' || !SMS_VERIFICATION_PURPOSES.includes(value as SmsVerificationPurpose)) {
@@ -66,6 +64,7 @@ async function latestChallenge(db: D1Database, phoneE164: string, purpose: SmsVe
     ORDER BY created_at DESC LIMIT 1`).bind(phoneE164, purpose).first<{ id: string }>();
 }
 
+
 export class MockSmsProvider implements SmsVerificationProvider {
   async sendCode(input: {
     db: D1Database;
@@ -73,25 +72,12 @@ export class MockSmsProvider implements SmsVerificationProvider {
     purpose: SmsVerificationPurpose;
     requestedIpHash: string;
     now?: Date;
-  }) {
+  }): Promise<import('./sms-provider-shared').SmsSendResult> {
     ensureMockAllowed();
     const now = input.now ?? new Date();
     if (input.phoneE164 === '+8613700137000') throw new Response('短信发送失败，请稍后重试', { status: 503 });
-    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    const latest = await input.db.prepare(`SELECT created_at FROM sms_verifications
-      WHERE phone_e164=? ORDER BY created_at DESC LIMIT 1`).bind(input.phoneE164).first<{ created_at: string }>();
-    if (latest && now.getTime() - new Date(latest.created_at).getTime() < 60_000) {
-      const retry = Math.max(1, Math.ceil((60_000 - (now.getTime() - new Date(latest.created_at).getTime())) / 1000));
-      throw new Response(`验证码发送过于频繁，请在${retry}秒后再试`, { status: 429, headers: { 'Retry-After': String(retry) } });
-    }
-    const phoneHour = await input.db.prepare('SELECT COUNT(*) total FROM sms_verifications WHERE phone_e164=? AND created_at>=?').bind(input.phoneE164, hourAgo).first<{ total: number }>();
-    const phoneDay = await input.db.prepare('SELECT COUNT(*) total FROM sms_verifications WHERE phone_e164=? AND created_at>=?').bind(input.phoneE164, dayAgo).first<{ total: number }>();
-    const ipHour = await input.db.prepare('SELECT COUNT(*) total FROM sms_verifications WHERE requested_ip_hash=? AND created_at>=?').bind(input.requestedIpHash, hourAgo).first<{ total: number }>();
-    const ipDay = await input.db.prepare('SELECT COUNT(*) total FROM sms_verifications WHERE requested_ip_hash=? AND created_at>=?').bind(input.requestedIpHash, dayAgo).first<{ total: number }>();
-    if (input.phoneE164 === '+8613600136000' || Number(phoneHour?.total ?? 0) >= 5 || Number(phoneDay?.total ?? 0) >= 10 || Number(ipHour?.total ?? 0) >= 20 || Number(ipDay?.total ?? 0) >= 50) {
-      throw new Response('验证码请求过于频繁，请稍后再试', { status: 429, headers: { 'Retry-After': '3600' } });
-    }
+    await assertSmsSendAllowed({ ...input, now });
+    if (input.phoneE164 === '+8613600136000') throw new SmsProviderError('SMS_TOO_FREQUENT', 429, 3600);
     const challengeId = crypto.randomUUID();
     const code = MOCK_CODES[input.phoneE164] ?? '123456';
     const expiresAt = input.phoneE164 === '+8613900139000'
@@ -103,7 +89,7 @@ export class MockSmsProvider implements SmsVerificationProvider {
       VALUES (?,?,?,?,?,0,5,NULL,?,?)`).bind(
         challengeId, input.phoneE164, input.purpose, codeHash, expiresAt.toISOString(), now.toISOString(), input.requestedIpHash,
       ).run();
-    return { cooldownSeconds: 60, expiresInSeconds: 300 };
+    return { cooldownSeconds: 60, expiresInSeconds: 300, provider: 'MOCK', acceptedAt: now.toISOString(), providerStatus: 'ACCEPTED' };
   }
 
   async verifyCode(input: {
@@ -134,5 +120,9 @@ export class MockSmsProvider implements SmsVerificationProvider {
 }
 
 export function smsProvider(): SmsVerificationProvider {
+  const settings = smsEnvironment();
+  if ((settings.SMS_MODE || '').toLowerCase() === 'aliyun') {
+    return new AliyunSmsAuthenticationProvider(settings);
+  }
   return new MockSmsProvider();
 }

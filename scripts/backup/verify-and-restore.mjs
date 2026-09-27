@@ -196,10 +196,10 @@ async function main() {
     manifest.backup_format_version !== 1 ||
     manifest.project_id !== 'appgprj_6a9b746cbba88191bd63914f864ffb5e' ||
     manifest.binding !== 'DB' ||
-    manifest.schema_version !== '0008' ||
+    manifest.schema_version !== '0009' ||
     !Array.isArray(manifest.tables)
   ) {
-    fail('manifest 与当前 0008 手机号认证结构备份要求不匹配');
+    fail('manifest 与当前 0009 阿里云短信结构备份要求不匹配');
   }
   const manifestTables = manifest.tables.map((entry) => entry.table_name);
   if (
@@ -246,7 +246,7 @@ async function main() {
     '--persist-to',
     state,
   ];
-  for (let version = 0; version <= 8; version += 1) {
+  for (let version = 0; version <= 9; version += 1) {
     const prefix = String(version).padStart(4, '0');
     const migration = [
       '0000_multi_family.sql',
@@ -258,6 +258,7 @@ async function main() {
       '0006_collaboration_persistence.sql',
       '0007_auth_identity_foundation.sql',
       '0008_phone_change_challenges.sql',
+      '0009_aliyun_sms_provider.sql',
     ][version];
     if (!migration.startsWith(prefix)) fail('migration 顺序配置错误');
     runWrangler([...baseArgs, '--file', join(projectRoot, 'drizzle', migration)]);

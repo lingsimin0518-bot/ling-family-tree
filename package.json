@@ -13,6 +13,7 @@
     "backup:test-fixture": "node --experimental-strip-types scripts/backup/create-local-test-backup.mjs",
     "test:auth-foundation": "node --experimental-strip-types scripts/auth/test-auth-foundation.mjs",
     "test:phone-auth": "node scripts/phone-auth/test-phone-auth.mjs",
+    "test:aliyun-sms": "node --experimental-strip-types scripts/aliyun-sms/test-aliyun-provider.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
   },

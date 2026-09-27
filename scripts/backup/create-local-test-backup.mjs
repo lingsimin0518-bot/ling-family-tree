@@ -37,6 +37,7 @@ const MIGRATIONS = [
   '0006_collaboration_persistence.sql',
   '0007_auth_identity_foundation.sql',
   '0008_phone_change_challenges.sql',
+  '0009_aliyun_sms_provider.sql',
 ];
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const encoder = new TextEncoder();
@@ -141,7 +142,7 @@ async function main() {
   }
 
   const schemaJson = jsonBytes({
-    schema_version: '0008',
+    schema_version: '0009',
     tables: schemaTables,
     sqlite_schema: schemaRows.filter(
       (entry) => TABLES.includes(entry.table_name) || TABLES.includes(entry.name),
@@ -156,7 +157,7 @@ async function main() {
   const now = new Date().toISOString();
   const manifest = {
     backup_format_version: 1,
-    schema_version: '0008',
+    schema_version: '0009',
     export_started_at: now,
     export_finished_at: now,
     project_id: 'appgprj_6a9b746cbba88191bd63914f864ffb5e',
@@ -171,7 +172,7 @@ async function main() {
     ...tableFiles,
   ];
   const zip = createStoredZipStream(files);
-  const zipPath = join(work, 'local-0008-19-table-backup.zip');
+  const zipPath = join(work, 'local-0009-19-table-backup.zip');
   await writeFile(zipPath, new Uint8Array(await new Response(zip).arrayBuffer()));
   console.log(zipPath);
 }

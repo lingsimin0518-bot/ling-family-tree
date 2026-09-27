@@ -145,6 +145,11 @@ async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) 
     }
   }
 
+  if (schemaNames.has('sms_verifications')) {
+    const columns = await binding.prepare('PRAGMA table_info("sms_verifications")').all<ColumnInfo>();
+    if (columns.results.some((column) => column.name === 'provider_challenge_id')) return '0009';
+  }
+
   if (schemaNames.has('phone_change_challenges')) {
     return '0008';
   }

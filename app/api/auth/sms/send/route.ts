@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       }
     }
     const result = await sendPhoneCode({ request, phone: body.phone, purpose });
-    return Response.json({ ok: true, ...result }, { headers: { 'Cache-Control': 'private, no-store' } });
+    return Response.json({ ok: true, cooldownSeconds: result.cooldownSeconds, expiresInSeconds: result.expiresInSeconds }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     return authApiError(error);
   }
