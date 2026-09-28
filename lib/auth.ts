@@ -158,20 +158,18 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
     const phoneMatch = await binding.prepare('SELECT id FROM users WHERE phone=?').bind(values.phone).first();
     if (phoneMatch) throw new Response('该手机号已被注册', {status:409});
   }
-  let existing: {id:string;password_hash?:string|null}|null = null;
-  if (values.email) existing = await binding.prepare('SELECT id,password_hash FROM users WHERE email=? COLLATE NOCASE').bind(values.email).first<{id:string;password_hash?:string|null}>();
-  if (existing?.password_hash) throw new Response('该邮箱已被注册', {status:409});
-  const id = existing?.id ?? crypto.randomUUID();
+  if (values.email) {
+    const emailMatch = await binding.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').bind(values.email).first();
+    // Ordinary registration must never activate or take over an existing identity.
+    if (emailMatch) throw new Response('该邮箱已被注册', {status:409});
+  }
+  const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const passwordHash = await hashPassword(values.password);
   try {
-    if (existing) {
-      await binding.prepare('UPDATE users SET username=?,password_hash=?,email=?,phone=?,nickname=?,display_name=?,status=\'ACTIVE\',updated_at=? WHERE id=? AND password_hash IS NULL')
-        .bind(values.username,passwordHash,values.email || null,values.phone || null,values.nickname,values.nickname,now,id).run();
-    } else {
-      await binding.prepare('INSERT INTO users (id,username,password_hash,email,phone,nickname,avatar,status,display_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,\'ACTIVE\',?,?,?)')
-        .bind(id,values.username,passwordHash,values.email || null,values.phone || null,values.nickname,'',values.nickname,now,now).run();
-    }
+    const inserted = await binding.prepare('INSERT INTO users (id,username,password_hash,email,phone,nickname,avatar,status,display_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,\'ACTIVE\',?,?,?)')
+      .bind(id,values.username,passwordHash,values.email || null,values.phone || null,values.nickname,'',values.nickname,now,now).run();
+    if (Number(inserted.meta.changes ?? 0) !== 1) throw new Error('registration insert did not create exactly one user');
   } catch (error) {
     console.error('registration insert failed', error);
     const conflict = registrationConflictMessage(error);
@@ -179,7 +177,7 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
     throw new Response('账号创建失败，请稍后重试', {status:500});
   }
   const row = await binding.prepare('SELECT id,username,email,phone,nickname,avatar,status,system_role,display_name FROM users WHERE id=?').bind(id).first<Record<string,unknown>>();
-  if (!row) throw new Error('注册完成后无法读取账号');
+  if (!row || toText(row.status) !== 'ACTIVE' || toText(row.id) !== id) throw new Error('注册完成后无法确认新账号状态');
   return {user:publicAuthUser(row),cookie:await createAuthSession(id,request)};
 }
 

@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>凌氏家谱 H5</title>
+  <title>家谱</title>
   <style>
 :root {
   color-scheme: light;
@@ -424,7 +424,7 @@ dd { margin: 0; }
   <header class="app-header">
     <div>
       <p class="eyebrow">H5 单文件版 · 家族内部测试</p>
-      <h1>凌氏家谱</h1>
+      <h1>家谱</h1>
       <p class="subtitle">慎终追远 · 记录家族根脉</p>
     </div>
     <div class="header-actions">
@@ -1132,172 +1132,16 @@ window.installFamilyFeatures = function (api) {
 
 </script>
 <script>
-// 规范化族谱测试数据。新增人物均为虚构，仅用于验证产品功能。
-(function () {
-  const people = [];
-  const unions = [];
-  const occupations = ["机械工程师", "教师", "会计", "自动化工程师", "医务工作者", "软件工程师", "设计师", "技术员"];
-  const laterNames = ["承远", "思源", "知行", "启航", "书言", "景初", "浩然", "明川", "星野", "修远", "嘉树", "予安", "泽宇", "博文", "云舟", "悦宁", "清和", "望舒", "致远", "卓然", "亦辰", "宇航", "允诚", "沐阳"];
-  const spouseSurnames = ["王", "李", "张", "刘", "陈", "杨", "赵", "周", "吴", "徐", "孙", "胡"];
-  const spouseNames = ["静怡", "雅文", "若溪", "佳宁", "雨桐", "婉清", "可心", "欣悦", "明哲", "晓彤", "诗雨", "安琪"];
-  let sequence = 0;
-
-  function addPerson(input) {
-    const person = {
-      id: input.id || `person-${++sequence}`,
-      name: input.name,
-      gender: input.gender,
-      generation: input.generation,
-      lineage: input.lineage || "ling",
-      synthetic: Boolean(input.synthetic),
-      birthYear: input.birthYear || "未知",
-      occupation: input.occupation || "未记录",
-      biography: input.biography || "生平资料暂未收集。",
-      fatherId: input.fatherId || null,
-      motherId: input.motherId || null
-    };
-    people.push(person);
-    return person;
-  }
-
-  function addUnion(a, b, children) {
-    unions.push({ id: `union-${unions.length + 1}`, partnerAId: a.id, partnerBId: b.id, childrenIds: children.map((child) => child.id) });
-  }
-
-  function parentsOf(a, b) {
-    return {
-      father: a.gender === "男" ? a : b.gender === "男" ? b : null,
-      mother: a.gender === "女" ? a : b.gender === "女" ? b : null
-    };
-  }
-
-  function generatedBiography(name, occupation) {
-    return `${name}为功能演示生成的测试人物，曾从事${occupation}相关工作，重视家庭教育，也参与整理照片、书信和长辈口述资料。`;
-  }
-
-  function makeLing(name, gender, generation, parents, synthetic, index) {
-    const occupation = occupations[index % occupations.length];
-    return addPerson({
-      name, gender, generation, lineage: "ling", synthetic,
-      birthYear: generation > 5 ? "年份待考（测试）" : `${1900 + generation * 27 + (index % 13)}${synthetic ? "（测试）" : "（待考）"}`,
-      occupation: `${occupation}${synthetic ? "（测试）" : "（待补充）"}`,
-      biography: synthetic ? generatedBiography(name, occupation) : `${name}的详细生平仍待家族成员补充。`,
-      fatherId: parents && parents.father ? parents.father.id : null,
-      motherId: parents && parents.mother ? parents.mother.id : null
-    });
-  }
-
-  function makeSpouse(generation, index, gender, fixedName) {
-    const name = fixedName || `${spouseSurnames[index % spouseSurnames.length]}${spouseNames[index % spouseNames.length]}`;
-    const occupation = occupations[(index + 2) % occupations.length];
-    return addPerson({ name, gender, generation, lineage: "external", synthetic: !fixedName, birthYear: `${1930 + generation * 24 + (index % 11)}${fixedName ? "（待考）" : "（测试）"}`, occupation: `${occupation}${fixedName ? "（待补充）" : "（测试）"}`, biography: fixedName ? `${name}的详细生平仍待补充。` : generatedBiography(name, occupation) });
-  }
-
-  function growBelow(parent, spouse, seed, maxGeneration) {
-    if (parent.generation >= maxGeneration) return;
-    const nextGeneration = parent.generation + 1;
-    // 第四代通常1人，少数2人；第五代1-3人；第六至八代以1人为主，少数2人。
-    const childCount = nextGeneration === 4 ? 1 + (seed % 5 === 0 ? 1 : 0) : nextGeneration >= 6 ? 1 + (seed % 4 === 0 ? 1 : 0) : 1 + (seed % 3);
-    const children = [];
-    for (let i = 0; i < childCount; i += 1) {
-      const index = seed * 3 + i;
-      const gender = index % 3 === 0 ? "女" : "男";
-      const maternalBranchStopsHere = parent.generation === 3 && parent.gender === "女";
-      const husbandSurname = spouse && spouse.name ? spouse.name.charAt(0) : "外";
-      const childName = `${maternalBranchStopsHere ? husbandSurname : "凌"}${laterNames[index % laterNames.length]}`;
-      const child = maternalBranchStopsHere
-        ? addPerson({ name: childName, gender, generation: nextGeneration, lineage: "external", synthetic: true, birthYear: `${1900 + nextGeneration * 27 + (index % 13)}（测试）`, occupation: `${occupations[index % occupations.length]}（测试）`, biography: `${childName}为第三代女性成员的子女，按男方姓氏记录；本族谱只记录至第四代。`, fatherId: parentsOf(parent, spouse).father.id, motherId: parentsOf(parent, spouse).mother.id })
-        : makeLing(childName, gender, nextGeneration, parentsOf(parent, spouse), true, index);
-      children.push(child);
-      if (!maternalBranchStopsHere) {
-        const childSpouse = makeSpouse(nextGeneration, index + 4, gender === "男" ? "女" : "男");
-        if (nextGeneration < maxGeneration) growBelow(child, childSpouse, index + 7, maxGeneration);
-        else addUnion(child, childSpouse, []);
-      }
-    }
-    addUnion(parent, spouse, children);
-  }
-
-  function addKnownMainFamily() {
-    const ancestor = addPerson({ id: "g1-main", name: "凌氏先祖（姓名待考）", gender: "男", generation: 1, lineage: "ling", biography: "现有资料确认其为凌玉禾、凌玉平、凌玉书、凌玉明、凌玉忠、凌玉伟、凌玉鹏和凌玉飞的父亲。" });
-    const ancestorSpouse = addPerson({ id: "g1-main-spouse", name: "配偶（姓名待考）", gender: "女", generation: 1, lineage: "external", biography: "姓名与生平尚待考证；目前不能确认全部第二代成员均为其亲生子女。" });
-    const rows = [
-      ["凌玉禾", "男", "杨文英", "女", ["凌永星", "凌淑瑾"]],
-      ["凌玉平", "男", "李凤荣", "女", ["凌永辉"]],
-      ["凌玉书", "男", "刑贵凤", "女", ["凌永祥"]],
-      ["凌玉明", "男", "宝春杰", "女", ["凌宝"]],
-      ["凌玉忠", "男", "任伟", "女", ["凌雨"]],
-      ["凌玉伟", "男", "王淑艳", "女", ["凌晨", "凌淑珩"]],
-      ["凌玉鹏", "男", "聂晓梅", "女", ["凌浩"]],
-      ["凌玉飞", "男", "王东红", "女", ["凌永琦", "凌珑", "凌舒琪"]],
-      ["凌亚茹", "女", "李学富", "男", ["李小颖", "李明月"]]
-    ];
-    const gen2Children = [];
-    const knownSpouses = { "凌永辉": "董海霞", "凌永祥": "四婶（姓名待考）", "凌宝": "五婶（姓名待考）", "凌雨": "六婶（姓名待考）", "凌淑珩": "乌尔乐", "李小颖": "车（姓名不完整）", "李明月": "张光磊" };
-
-    rows.forEach((row, branchIndex) => {
-      const member = makeLing(row[0], row[1], 2, parentsOf(ancestor, ancestorSpouse), false, branchIndex);
-      const partner = makeSpouse(2, branchIndex, row[3], row[2]);
-      const gen3Children = row[4].map((name, childIndex) => {
-        const femaleNames = ["凌淑瑾", "凌晨", "凌淑珩", "凌珑", "凌舒琪", "李小颖", "李明月"];
-        const gender = femaleNames.includes(name) ? "女" : "男";
-        return addPerson({ name, gender, generation: 3, lineage: name.startsWith("凌") ? "ling" : "external", birthYear: `${1960 + branchIndex * 2 + childIndex}（待考）`, occupation: "待补充", biography: `${name}的详细生平仍待补充。`, fatherId: parentsOf(member, partner).father.id, motherId: parentsOf(member, partner).mother.id });
-      });
-      addUnion(member, partner, gen3Children);
-      gen3Children.filter((child) => child.lineage === "ling").forEach((child, childIndex) => {
-        const spouseName = knownSpouses[child.name];
-        const spouse = makeSpouse(3, branchIndex * 4 + childIndex, child.gender === "男" ? "女" : "男", spouseName);
-        growBelow(child, spouse, branchIndex * 5 + childIndex + 1, 8);
-      });
-      gen2Children.push(member);
-    });
-    addUnion(ancestor, ancestorSpouse, gen2Children);
-  }
-
-  function addSyntheticFirstGeneration(name, spouseName, rootIndex, gen2Count) {
-    const root = addPerson({ name, gender: "男", generation: 1, lineage: "ling", synthetic: true, birthYear: `${1902 + rootIndex * 4}（测试）`, occupation: "农商从业者（测试）", biography: generatedBiography(name, "农商") });
-    const spouse = addPerson({ name: spouseName, gender: "女", generation: 1, lineage: "external", synthetic: true, birthYear: `${1905 + rootIndex * 4}（测试）`, occupation: "家庭教育（测试）", biography: generatedBiography(spouseName, "家庭教育") });
-    const gen2Children = [];
-    for (let i = 0; i < gen2Count; i += 1) {
-      const gender = i === gen2Count - 1 ? "女" : "男";
-      const child = makeLing(`凌玉${laterNames[(rootIndex * 5 + i) % laterNames.length].slice(-1)}`, gender, 2, parentsOf(root, spouse), true, rootIndex * 10 + i);
-      const childSpouse = makeSpouse(2, rootIndex * 10 + i, gender === "男" ? "女" : "男");
-      const gen3Children = [];
-      const gen3Count = 1 + ((rootIndex + i) % 3);
-      for (let j = 0; j < gen3Count; j += 1) {
-        const gen3Gender = (i + j) % 3 === 0 ? "女" : "男";
-        const gen3 = makeLing(`凌永${laterNames[(rootIndex * 7 + i * 2 + j) % laterNames.length].slice(-1)}`, gen3Gender, 3, parentsOf(child, childSpouse), true, rootIndex * 30 + i * 3 + j);
-        const gen3Spouse = makeSpouse(3, rootIndex * 30 + i * 3 + j, gen3Gender === "男" ? "女" : "男");
-        growBelow(gen3, gen3Spouse, rootIndex * 31 + i * 5 + j + 1, 8);
-        gen3Children.push(gen3);
-      }
-      addUnion(child, childSpouse, gen3Children);
-      gen2Children.push(child);
-    }
-    addUnion(root, spouse, gen2Children);
-  }
-
-  addKnownMainFamily();
-  addSyntheticFirstGeneration("凌元德", "许兰芝", 1, 4);
-  addSyntheticFirstGeneration("凌元庆", "韩秀云", 2, 5);
-  // 仅为虚构始祖提供已故状态，用于纪念馆演示；真实成员状态不作推断。
-  people.filter(person => person.synthetic && person.generation === 1).forEach(person => {
-    person.lifeStatus = 'deceased';
-    person.deathDate = '';
-    person.tombDescription = '演示资料：安葬地点与碑文尚未录入。';
-  });
-  // 原有凌氏家谱作为多族谱架构中的一册保留；每条人物与关系均显式标记 familyId。
-  const familyId = "family-lingshi-existing";
-  people.forEach(person => { person.familyId = familyId; });
-  unions.forEach(union => { union.familyId = familyId; });
-  window.NORMALIZED_FAMILY_TREE = { familyId, people, unions, metadata: { familyId, maxGeneration: 8, firstGenerationFamilies: 3 } };
-})();
+// S0 containment: real genealogy data must never ship in a public static asset.
+window.NORMALIZED_FAMILY_TREE = null;
 
 </script>
+
 <script>
 async function loadCurrentFamilyTree() {
-  const requestedFamilyId = new URLSearchParams(location.search).get('family_id') || 'family-lingshi-existing';
+  const requestedFamilyId = new URLSearchParams(location.search).get('family_id');
   try {
+    if (!requestedFamilyId) throw new Error('尚未选择族谱');
     const response = await fetch(`/api/families?family_id=${encodeURIComponent(requestedFamilyId)}`, { credentials: 'same-origin' });
     if (!response.ok) throw new Error(`读取族谱失败（${response.status}）`);
     const payload = await response.json();
@@ -1309,17 +1153,6 @@ async function loadCurrentFamilyTree() {
     if (accountLabel) accountLabel.textContent = `${payload.role || 'VIEWER'} · 已登录`;
     const loginButton = document.querySelector('#loginButton');
     if (loginButton) loginButton.hidden = true;
-
-    if (family.source_type === 'LEGACY_STATIC' && !(payload.people || []).length) {
-      window.NORMALIZED_FAMILY_TREE.familyId = requestedFamilyId;
-      window.NORMALIZED_FAMILY_TREE.family = family;
-      window.NORMALIZED_FAMILY_TREE.role = payload.role;
-      window.NORMALIZED_FAMILY_TREE.currentUserId = payload.currentUserId;
-      window.NORMALIZED_FAMILY_TREE.announcements = payload.announcements || [];
-      window.NORMALIZED_FAMILY_TREE.claims = payload.claims || [];
-      window.NORMALIZED_FAMILY_TREE.members = payload.members || [];
-      return window.NORMALIZED_FAMILY_TREE;
-    }
 
     const people = (payload.people || []).map(person => ({
       id: person.id,
@@ -1409,12 +1242,19 @@ async function loadCurrentFamilyTree() {
   } catch (error) {
     const status = document.querySelector('#searchStatus');
     if (status) status.textContent = error instanceof Error ? error.message : '暂时无法读取当前族谱';
-    return window.NORMALIZED_FAMILY_TREE;
+    return null;
   }
 }
 
 (async function () {
   const data = await loadCurrentFamilyTree();
+  if (!data) {
+    const tree = document.querySelector('#tree');
+    if (tree) tree.replaceChildren();
+    const stats = document.querySelector('#stats');
+    if (stats) stats.textContent = '族谱数据未加载';
+    return;
+  }
   const familyDisplayName = data.family?.name || '家谱';
   const familyStem = familyDisplayName.replace(/(?:家谱|族谱)$/, '');
   document.querySelectorAll('[data-family-name]').forEach((node) => { node.textContent = familyDisplayName; });
@@ -1598,17 +1438,17 @@ async function loadCurrentFamilyTree() {
     const motherName = parents && parents.mother ? parents.mother.name : "未记录";
     const partner = partnerOf(person);
     memberDetail.innerHTML = `
-      <p class="eyebrow">第 ${person.generation} 代${person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 母系后代（随父姓）" : " · 配偶成员"}</p>
-      <h2>${person.name}</h2>
+      <p class="eyebrow">第 ${escapeHtml(person.generation)} 代${person.lineage === "ling" ? "" : person.fatherId || person.motherId ? " · 母系后代（随父姓）" : " · 配偶成员"}</p>
+      <h2>${escapeHtml(person.name)}</h2>
       <dl>
-        <div><dt>性别</dt><dd>${person.gender}</dd></div>
-        <div><dt>出生年份</dt><dd>${person.birthYear}</dd></div>
-        <div><dt>职业</dt><dd>${person.occupation}</dd></div>
-        <div><dt>配偶</dt><dd>${partner ? partner.name : "未记录"}</dd></div>
-        ${parents ? `<div><dt>父亲</dt><dd>${fatherName}</dd></div><div><dt>母亲</dt><dd>${motherName}</dd></div>` : ""}
+        <div><dt>性别</dt><dd>${escapeHtml(person.gender)}</dd></div>
+        <div><dt>出生年份</dt><dd>${escapeHtml(person.birthYear)}</dd></div>
+        <div><dt>职业</dt><dd>${escapeHtml(person.occupation)}</dd></div>
+        <div><dt>配偶</dt><dd>${escapeHtml(partner ? partner.name : "未记录")}</dd></div>
+        ${parents ? `<div><dt>父亲</dt><dd>${escapeHtml(fatherName)}</dd></div><div><dt>母亲</dt><dd>${escapeHtml(motherName)}</dd></div>` : ""}
         <div><dt>资料状态</dt><dd>${person.synthetic ? "随机测试资料" : "家族原始记录/待考"}</dd></div>
       </dl>
-      <section class="biography"><h3>生平简历</h3><p>${person.biography}</p>${parents ? `<p><strong>父母：</strong>${fatherName}、${motherName}</p>` : ""}</section>
+      <section class="biography"><h3>生平简历</h3><p>${escapeHtml(person.biography)}</p>${parents ? `<p><strong>父母：</strong>${escapeHtml(fatherName)}、${escapeHtml(motherName)}</p>` : ""}</section>
     `;
     memberDialog.showModal();
   }
@@ -2241,7 +2081,7 @@ async function loadCurrentFamilyTree() {
       <form id="addForm" class="member-form">
         <label>搜索父母成员<input id="parentSearch" type="search" placeholder="姓名或首字母，如 LYH"></label>
         <label>父母家庭中的一方<select id="parentSelect" name="parentId" required></select></label>
-        <label>姓名<input name="name" required placeholder="例如：凌某某"></label>
+        <label>姓名<input name="name" required placeholder="例如：张某某"></label>
         <label>性别<select name="gender"><option>男</option><option>女</option></select></label>
         <label>出生年份<input name="birthYear" required placeholder="例如：1998"></label>
         <label>职业<input name="occupation" required placeholder="例如：教师"></label>
