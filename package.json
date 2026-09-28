@@ -14,6 +14,7 @@
     "test:auth-foundation": "node --experimental-strip-types scripts/auth/test-auth-foundation.mjs",
     "test:phone-auth": "node scripts/phone-auth/test-phone-auth.mjs",
     "test:aliyun-sms": "node --experimental-strip-types scripts/aliyun-sms/test-aliyun-provider.mjs",
+    "test:controlled-sms": "node --experimental-strip-types scripts/aliyun-sms/test-controlled-sms.mjs",
     "check:aliyun-sms-config": "node scripts/aliyun-sms/check-real-config.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
