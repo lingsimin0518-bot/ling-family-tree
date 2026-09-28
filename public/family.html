@@ -1095,15 +1095,18 @@ window.installFamilyFeatures = function (api) {
     composer.replaceChildren(button('关闭',()=>composer.close()),el('h2',kind === 'announcements' ? (existing ? '修改家族公告' : '发布家族公告') : '分享家族动态'));
     const form = el('form','','member-form'); form.innerHTML = '<label>标题<input name="title" required maxlength="100"></label><label>正文<textarea name="body" required maxlength="3000" rows="7"></textarea></label><p>内容将保存到当前族谱，刷新或更换设备后仍可查看。</p><button type="submit">提交</button>';
     if (existing) { form.elements.title.value=existing.title; form.elements.body.value=existing.body; }
+    let submitting = false;
     form.addEventListener('submit', async event => {
       event.preventDefault(); if (!api.getRole() || (kind === 'announcements' && api.getRole() !== 'admin')) { composer.close(); return; }
+      if (submitting) return;
       const fields = new FormData(form); const title = fields.get('title').trim(), body = fields.get('body').trim(); if (!title || !body) return;
+      const submitButton = form.querySelector('button[type="submit"]'); submitting = true; submitButton.disabled = true; submitButton.textContent = '提交中…';
       try {
         if (kind === 'announcements') await communityRequest('/api/announcements',{method:existing?'PATCH':'POST',body:JSON.stringify({familyId:data.familyId,id:existing?.id,title,body})});
         else await communityRequest('/api/activities',{method:'POST',body:JSON.stringify({familyId:data.familyId,title,body})});
-        composer.close(); await loadCommunity();
+        form.reset(); composer.close(); await loadCommunity();
         document.querySelector('#searchStatus').textContent = kind === 'announcements' ? '公告已保存。' : '动态已提交，审核通过后公开展示。';
-      } catch (error) { form.querySelector('p').textContent=error instanceof Error ? error.message : '提交失败'; }
+      } catch (error) { submitting = false; submitButton.disabled = false; submitButton.textContent = '提交'; form.querySelector('p').textContent=error instanceof Error ? error.message : '提交失败'; }
     });
     composer.append(form); composer.showModal();
   }
