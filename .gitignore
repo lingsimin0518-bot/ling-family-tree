@@ -39,6 +39,7 @@ next-env.d.ts
 /work/
 /backups/
 production-before-*.zip
+production-schema-*.zip
 *.production-backup.zip
 
 # Unrelated paused Java migration prototype; never publish with the Worker site.

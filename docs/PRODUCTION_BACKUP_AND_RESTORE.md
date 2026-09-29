@@ -1,94 +1,79 @@
 # 生产 D1 备份与本地恢复验证
 
-本功能用于在执行 `0006_collaboration_persistence.sql` 之前，对 Sites 托管的生产 D1 创建完整的只读逻辑备份。
+本功能为 Sites 托管的生产 D1 创建只读逻辑备份。导出器会先检查真实表结构，只接受两个完整、稳定的结构：
+
+- schema 0006：16 张业务表；
+- schema 0010：19 张业务表（恢复工具也兼容 0008/0009 的19表结构）。
+
+如果只出现部分认证新表，导出会整体失败，不会把半升级数据库标记为有效备份。
 
 ## 谁可以导出
 
-只有系统级 `SUPER_ADMIN` 可以访问系统后台的“生产备份”页面并调用导出接口。族谱内部的 `OWNER`、`ADMIN`、`EDITOR`、`VIEWER` 均无权导出。
+只有系统级 SUPER_ADMIN 可以调用 POST /api/admin/backups/export。族谱内部 OWNER、ADMIN、EDITOR、VIEWER 均无权导出。维护模式开启时，此只读运维能力仍保留。
 
-后端接口为：
+## 导出方式
 
-```text
-POST /api/admin/backups/export
-```
+1. 使用 SUPER_ADMIN 登录。
+2. 进入 /admin 的“生产备份”。
+3. 点击“生成并下载完整备份”。
+4. 把 production-schema-版本-时间.zip 保存到项目外的受保护目录。
 
-接口在 Worker 后端执行 `requireSuperAdmin(request)`，不是仅通过前端隐藏按钮限制。
+导出只执行读取、导出前后行数核对与校验和计算，不应用 migration，也不执行业务数据写入。
 
-## 如何导出
+## ZIP 内容
 
-1. 使用 `SUPER_ADMIN` 账号登录。
-2. 进入 `/admin`。
-3. 选择“生产备份”。
-4. 阅读敏感数据提示。
-5. 点击“生成并下载完整备份”。
-6. 将下载的 `production-before-0006-时间.zip` 保存到受保护的备份目录。
+每个备份都包含 manifest.json、checksums.json、schema/schema.json、schema/README.md 和每张表独立的 tables/表名.json。
 
-导出是只读操作，不会执行 `INSERT`、`UPDATE` 或 `DELETE`，也不会应用 migration。
+manifest 是表集合的权威来源，记录真实 schema_version、表文件、逐表行数和 SHA-256。
 
-## 备份内容
+schema 0006 包含16张表：
 
-ZIP 包含 `manifest.json`、`checksums.json`、Schema 说明和以下13张表的独立 JSON：
+action_idempotency、action_rate_limit、announcements、families、family_activities、family_users、generations、media、person_claims、persons、relationships、review_requests、system_audit_logs、user_messages、user_sessions、users。
 
-- `action_idempotency`
-- `action_rate_limit`
-- `announcements`
-- `families`
-- `family_users`
-- `generations`
-- `media`
-- `person_claims`
-- `persons`
-- `relationships`
-- `system_audit_logs`
-- `user_sessions`
-- `users`
-
-备份保留完整恢复所需的敏感数据，包括密码哈希、邮箱、手机号、登录会话和完整族谱资料。
+schema 0010 在此基础上增加 phone_change_challenges、sms_verifications、user_identities。
 
 ## 安全保存
 
-- 不要把备份提交到 Git。
-- 不要发送到普通聊天、邮件附件或公开网盘。
-- 建议保存到加密磁盘或权限受限的离线目录。
-- 不要在日志中打印表数据或备份内容。
-- 从备份恢复出的 `user_sessions` 可能仍然有效，验证环境必须保持本地隔离。
+备份包含密码哈希、邮箱、手机号、登录会话和完整族谱资料：
 
-项目 `.gitignore` 已排除 `/backups/`、`production-before-*.zip` 和 `*.production-backup.zip`，但这不能替代安全保管。
+- 不得提交到 Git；
+- 不得发送到普通聊天、邮件附件或公开网盘；
+- 建议保存在加密磁盘或权限受限的离线目录；
+- 不在日志中打印表数据或备份内容；
+- 本地恢复环境必须隔离，因为恢复的 user_sessions 可能仍有效。
+
+.gitignore 排除 /backups/、production-before-*.zip、production-schema-*.zip 和 *.production-backup.zip。
 
 ## 本地恢复验证
 
-在项目目录运行：
+运行：
 
-```powershell
-pnpm backup:verify -- "F:\Backups\ling-family-tree\production-before-0006-时间.zip"
-```
+    pnpm backup:verify -- "F:\Backups\ling-family-tree\production-schema-0006-时间.zip"
 
-验证工具会：
+验证工具依据 manifest：
 
-1. 检查 ZIP 文件集合和 manifest。
-2. 确认13张表齐全。
-3. 校验 SHA-256。
-4. 在系统临时目录创建全新的隔离本地 D1。
-5. 仅应用 `0000` 至 `0005` migration。
-6. 确认本地目标库为空。
-7. 导入13张表。
-8. 对比每张表的实际行数与 manifest。
-9. 执行外键一致性检查。
+1. 验证 schema 与精确表集合；
+2. 验证 ZIP 无缺失文件或多余文件；
+3. 验证全部 SHA-256；
+4. 创建全新的隔离本地 D1；
+5. 只应用与备份版本匹配的 migration；
+6. 确认目标库所有对应表均为空；
+7. 按外键安全顺序导入；
+8. 对比逐表行数；
+9. 执行外键检查。
 
-工具不会使用 `--remote`，并会从子进程环境中移除 Cloudflare API Token 和 Account ID。它不会覆盖已有的本地数据库。
+工具不使用 --remote，并移除子进程中的 Cloudflare Token 与 Account ID。
 
-全部检查成功时，最后输出：
+本地双版本回归：
 
-```text
-PASS：备份结构、校验和、本地恢复、13张表行数和外键检查全部通过。
-```
+    pnpm backup:test-fixture
 
-出现任何 `FAIL` 时，都不能使用该文件作为执行 `0006` 前的有效备份。
+该命令分别生成并恢复验证 0006/16表 与 0010/19表 的纯本地测试备份。
 
 ## 当前限制
 
-- 这是应用层逻辑备份，不是 Sites 平台的时间点数据库快照。
-- 导出前后会核对每张表行数；如果行数变化，导出失败。
-- Worker 存在内存和响应大小限制，达到安全上限时接口会明确失败，不会截断数据。
-- 当前没有线上一键恢复功能。
-- 本工具只用于本地恢复验证，不会恢复或覆盖生产 D1。
+- 这是应用层逻辑备份，不是平台时间点快照；
+- 导出前后任一表行数变化都会导致整体失败；
+- 达到 Worker 安全内存上限时会明确失败，不会截断；
+- 没有线上一键恢复；
+- 恢复工具只面向全新本地 D1，不覆盖现有库。

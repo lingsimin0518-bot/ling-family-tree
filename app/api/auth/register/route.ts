@@ -1,7 +1,10 @@
 import { registerUser } from '../../../../lib/auth';
 import { registrationActor, runCreation } from '../../../../lib/creation-cooldown';
+import { maintenanceResponse } from '../../../../lib/maintenance';
 
 export async function POST(request: Request) {
+  const maintenance = maintenanceResponse();
+  if (maintenance) return maintenance;
   try {
     const body = await request.json() as Record<string,unknown>;
     const guarded = await runCreation({

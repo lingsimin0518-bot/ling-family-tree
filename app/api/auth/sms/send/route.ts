@@ -4,8 +4,11 @@ import { authDb } from '../../../../../lib/auth';
 import { normalizeMainlandChinaPhone } from '../../../../../lib/user-identity';
 import { assertPhoneChangeToken, sendPhoneCode } from '../../../../../lib/phone-auth';
 import { assertSmsPurpose } from '../../../../../lib/sms-provider';
+import { maintenanceResponse } from '../../../../../lib/maintenance';
 
 export async function POST(request: Request) {
+  const maintenance = maintenanceResponse();
+  if (maintenance) return maintenance;
   try {
     const body = await request.json() as Record<string, unknown>;
     const purpose = assertSmsPurpose(body.purpose);

@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const TABLES = [
+const TABLES_0006 = [
   'action_idempotency',
   'action_rate_limit',
   'announcements',
@@ -15,16 +15,22 @@ const TABLES = [
   'generations',
   'media',
   'person_claims',
-  'phone_change_challenges',
   'persons',
   'relationships',
   'review_requests',
-  'sms_verifications',
   'system_audit_logs',
-  'user_identities',
   'user_messages',
   'user_sessions',
   'users',
+];
+const TABLES_0010 = [
+  ...TABLES_0006.slice(0, 9),
+  'phone_change_challenges',
+  ...TABLES_0006.slice(9, 12),
+  'sms_verifications',
+  ...TABLES_0006.slice(12, 13),
+  'user_identities',
+  ...TABLES_0006.slice(13),
 ];
 const IMPORT_ORDER = [
   'users',
@@ -47,13 +53,19 @@ const IMPORT_ORDER = [
   'action_rate_limit',
   'action_idempotency',
 ];
-const REQUIRED_FILES = new Set([
-  'manifest.json',
-  'checksums.json',
-  'schema/schema.json',
-  'schema/README.md',
-  ...TABLES.map((table) => `tables/${table}.json`),
-]);
+const MIGRATIONS = [
+  '0000_multi_family.sql',
+  '0001_real_user_auth.sql',
+  '0002_wechat_identity.sql',
+  '0003_system_admin.sql',
+  '0004_unified_person_operations.sql',
+  '0005_creation_cooldown.sql',
+  '0006_collaboration_persistence.sql',
+  '0007_auth_identity_foundation.sql',
+  '0008_phone_change_challenges.sql',
+  '0009_aliyun_sms_provider.sql',
+  '0010_security_s0_containment.sql',
+];
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function fail(message) {
@@ -107,6 +119,27 @@ function parseJson(files, path) {
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
+}
+
+function schemaProfile(manifest) {
+  if (manifest.schema_version === '0006') {
+    return { tables: TABLES_0006, migrationCount: 7 };
+  }
+  if (['0008', '0009', '0010'].includes(manifest.schema_version)) {
+    return {
+      tables: TABLES_0010,
+      migrationCount: Number(manifest.schema_version) + 1,
+    };
+  }
+  fail(`不支持的备份 schema_version：${String(manifest.schema_version)}`);
+}
+
+function exactStringSet(actual, expected) {
+  return (
+    actual.length === expected.length &&
+    new Set(actual).size === expected.length &&
+    expected.every((value) => actual.includes(value))
+  );
 }
 
 function quoteIdentifier(value) {
@@ -184,32 +217,54 @@ async function main() {
   if (!input) fail('用法：pnpm backup:verify -- "<backup.zip>"');
   const zipPath = resolve(input);
   const files = unzipStored(new Uint8Array(await readFile(zipPath)));
-  const actualFiles = new Set(files.keys());
-  const missing = [...REQUIRED_FILES].filter((path) => !actualFiles.has(path));
-  const extra = [...actualFiles].filter((path) => !REQUIRED_FILES.has(path));
-  if (missing.length || extra.length) {
-    fail(`ZIP 文件集合不正确；缺少：${missing.join(', ') || '无'}；多出：${extra.join(', ') || '无'}`);
-  }
-
   const manifest = parseJson(files, 'manifest.json');
   if (
     manifest.backup_format_version !== 1 ||
     manifest.project_id !== 'appgprj_6a9b746cbba88191bd63914f864ffb5e' ||
     manifest.binding !== 'DB' ||
-    manifest.schema_version !== '0009' ||
     !Array.isArray(manifest.tables)
   ) {
-    fail('manifest 与当前 0009 阿里云短信结构备份要求不匹配');
+    fail('manifest 基本信息无效');
   }
+  const profile = schemaProfile(manifest);
+  const TABLES = profile.tables;
   const manifestTables = manifest.tables.map((entry) => entry.table_name);
-  if (
-    manifestTables.length !== TABLES.length ||
-    TABLES.some((table) => !manifestTables.includes(table))
-  ) {
-    fail('manifest 没有完整列出19张表');
+  if (!exactStringSet(manifestTables, TABLES)) {
+    fail(`manifest 没有完整且唯一地列出 schema ${manifest.schema_version} 的 ${TABLES.length} 张表`);
+  }
+  for (const entry of manifest.tables) {
+    if (
+      entry.file !== `tables/${entry.table_name}.json` ||
+      !Number.isSafeInteger(entry.row_count) ||
+      entry.row_count < 0 ||
+      typeof entry.sha256 !== 'string'
+    ) {
+      fail(`manifest 表定义无效：${String(entry.table_name)}`);
+    }
+  }
+  const requiredFiles = new Set([
+    'manifest.json',
+    'checksums.json',
+    'schema/schema.json',
+    'schema/README.md',
+    ...TABLES.map((table) => `tables/${table}.json`),
+  ]);
+  const actualFiles = new Set(files.keys());
+  const missing = [...requiredFiles].filter((path) => !actualFiles.has(path));
+  const extra = [...actualFiles].filter((path) => !requiredFiles.has(path));
+  if (missing.length || extra.length) {
+    fail(`ZIP 文件集合不正确；缺少：${missing.join(', ') || '无'}；多出：${extra.join(', ') || '无'}`);
   }
 
   const checksums = parseJson(files, 'checksums.json');
+  const expectedChecksumFiles = [
+    'schema/schema.json',
+    'schema/README.md',
+    ...TABLES.map((table) => `tables/${table}.json`),
+  ];
+  if (!exactStringSet(Object.keys(checksums), expectedChecksumFiles)) {
+    fail('checksums.json 的文件集合不完整或包含意外文件');
+  }
   for (const [path, expected] of Object.entries(checksums)) {
     const bytes = files.get(path);
     if (!bytes || sha256(bytes) !== expected) fail(`SHA-256 校验失败：${path}`);
@@ -246,20 +301,9 @@ async function main() {
     '--persist-to',
     state,
   ];
-  for (let version = 0; version <= 9; version += 1) {
+  for (let version = 0; version < profile.migrationCount; version += 1) {
     const prefix = String(version).padStart(4, '0');
-    const migration = [
-      '0000_multi_family.sql',
-      '0001_real_user_auth.sql',
-      '0002_wechat_identity.sql',
-      '0003_system_admin.sql',
-      '0004_unified_person_operations.sql',
-      '0005_creation_cooldown.sql',
-      '0006_collaboration_persistence.sql',
-      '0007_auth_identity_foundation.sql',
-      '0008_phone_change_challenges.sql',
-      '0009_aliyun_sms_provider.sql',
-    ][version];
+    const migration = MIGRATIONS[version];
     if (!migration.startsWith(prefix)) fail('migration 顺序配置错误');
     runWrangler([...baseArgs, '--file', join(projectRoot, 'drizzle', migration)]);
   }
@@ -273,7 +317,9 @@ async function main() {
   const importLines = ['PRAGMA foreign_keys=OFF;', 'BEGIN TRANSACTION;'];
   const tablePayloads = new Map();
   for (const table of TABLES) tablePayloads.set(table, parseJson(files, `tables/${table}.json`));
-  for (const table of IMPORT_ORDER) importLines.push(...tableInsertSql(table, tablePayloads.get(table)));
+  for (const table of IMPORT_ORDER.filter((entry) => TABLES.includes(entry))) {
+    importLines.push(...tableInsertSql(table, tablePayloads.get(table)));
+  }
   importLines.push('COMMIT;', 'PRAGMA foreign_keys=ON;');
   const importFile = join(work, 'restore.sql');
   await writeFile(importFile, `${importLines.join('\n')}\n`);
@@ -294,7 +340,9 @@ async function main() {
     console.log(`${result.pass ? 'PASS' : 'FAIL'} ${result.table}: ${result.actual}/${result.expected}`);
   }
   if (results.some((result) => !result.pass)) fail('一个或多个表的行数不一致');
-  console.log('PASS：备份结构、校验和、本地恢复、19张表行数和外键检查全部通过。');
+  console.log(
+    `PASS：schema ${manifest.schema_version} 备份结构、校验和、本地恢复、${TABLES.length}张表行数和外键检查全部通过。`,
+  );
   console.log(`隔离的本地验证目录：${work}`);
 }
 

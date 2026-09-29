@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import hostingConfig from '../.openai/hosting.json';
 import type { BackupArchiveFile } from './backup-archive';
 
-export const PRODUCTION_BACKUP_TABLES = [
+export const PRODUCTION_BACKUP_TABLES_0006 = [
   'action_idempotency',
   'action_rate_limit',
   'announcements',
@@ -12,16 +12,23 @@ export const PRODUCTION_BACKUP_TABLES = [
   'generations',
   'media',
   'person_claims',
-  'phone_change_challenges',
   'persons',
   'relationships',
   'review_requests',
-  'sms_verifications',
   'system_audit_logs',
-  'user_identities',
   'user_messages',
   'user_sessions',
   'users',
+] as const;
+
+export const PRODUCTION_BACKUP_TABLES = [
+  ...PRODUCTION_BACKUP_TABLES_0006.slice(0, 9),
+  'phone_change_challenges',
+  ...PRODUCTION_BACKUP_TABLES_0006.slice(9, 12),
+  'sms_verifications',
+  ...PRODUCTION_BACKUP_TABLES_0006.slice(12, 13),
+  'user_identities',
+  ...PRODUCTION_BACKUP_TABLES_0006.slice(13),
 ] as const;
 
 export type ProductionBackupTable = (typeof PRODUCTION_BACKUP_TABLES)[number];
@@ -122,15 +129,43 @@ function countFrom(result: D1Result<unknown>) {
   return value;
 }
 
-async function readCounts(binding: D1Database) {
+async function readCounts(
+  binding: D1Database,
+  tables: readonly ProductionBackupTable[],
+) {
   const results = await binding.batch(
-    PRODUCTION_BACKUP_TABLES.map((table) =>
+    tables.map((table) =>
       binding.prepare(`SELECT COUNT(*) AS total FROM "${table}"`),
     ),
   );
   return new Map(
-    PRODUCTION_BACKUP_TABLES.map((table, index) => [table, countFrom(results[index])]),
+    tables.map((table, index) => [table, countFrom(results[index])]),
   );
+}
+
+function selectBackupTables(schemaNames: Set<string>) {
+  const missingBaseTables = PRODUCTION_BACKUP_TABLES_0006.filter(
+    (table) => !schemaNames.has(table),
+  );
+  if (missingBaseTables.length > 0) {
+    throw new Error(`生产数据库缺少 0006 基础表：${missingBaseTables.join('、')}`);
+  }
+
+  const identityTables = [
+    'phone_change_challenges',
+    'sms_verifications',
+    'user_identities',
+  ] as const;
+  const existingIdentityTables = identityTables.filter((table) => schemaNames.has(table));
+  if (existingIdentityTables.length === 0) {
+    return [...PRODUCTION_BACKUP_TABLES_0006] as ProductionBackupTable[];
+  }
+  if (existingIdentityTables.length !== identityTables.length) {
+    throw new Error(
+      `数据库处于不完整认证升级状态：仅发现 ${existingIdentityTables.join('、')}`,
+    );
+  }
+  return [...PRODUCTION_BACKUP_TABLES] as ProductionBackupTable[];
 }
 
 async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) {
@@ -147,7 +182,14 @@ async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) 
 
   if (schemaNames.has('sms_verifications')) {
     const columns = await binding.prepare('PRAGMA table_info("sms_verifications")').all<ColumnInfo>();
-    if (columns.results.some((column) => column.name === 'provider_challenge_id')) return '0009';
+    if (columns.results.some((column) => column.name === 'provider_challenge_id')) {
+      const unsafeLegacy = await binding
+        .prepare(`SELECT COUNT(*) AS total FROM families
+          WHERE source_type='LEGACY_STATIC'
+            AND join_code NOT LIKE 'LEGACY-DISABLED-%'`)
+        .first<{ total: number | string }>();
+      return Number(unsafeLegacy?.total ?? 0) === 0 ? '0010' : '0009';
+    }
   }
 
   if (schemaNames.has('phone_change_challenges')) {
@@ -184,26 +226,20 @@ export type ProductionBackup = {
 export async function createProductionBackup(): Promise<ProductionBackup> {
   const binding = db();
   const exportStartedAt = new Date().toISOString();
-  const countsBefore = await readCounts(binding);
   const schemaResult = await binding
     .prepare(`SELECT type,name,tbl_name AS table_name,sql FROM sqlite_schema
       WHERE type IN ('table','index') ORDER BY type,name`)
     .all<SchemaObject>();
   const schemaNames = new Set(schemaResult.results.map((entry) => entry.name));
-  const missingTables = PRODUCTION_BACKUP_TABLES.filter(
-    (table) => !schemaNames.has(table),
-  );
-  if (missingTables.length > 0) {
-    throw new Error(`生产数据库缺少备份表：${missingTables.join('、')}`);
-  }
-
+  const backupTables = selectBackupTables(schemaNames);
+  const countsBefore = await readCounts(binding, backupTables);
   const schemaVersion = await readSchemaVersion(binding, schemaNames);
   const tableFiles: BackupArchiveFile[] = [];
   const tableManifests: TableManifest[] = [];
   const schemaTables: Record<string, ColumnInfo[]> = {};
   let totalJsonBytes = 0;
 
-  for (const table of PRODUCTION_BACKUP_TABLES) {
+  for (const table of backupTables) {
     const [columnsResult, rowsResult] = await Promise.all([
       binding.prepare(`PRAGMA table_info("${table}")`).all<ColumnInfo>(),
       binding.prepare(`SELECT * FROM "${table}"`).all<Record<string, unknown>>(),
@@ -235,8 +271,8 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
     });
   }
 
-  const countsAfter = await readCounts(binding);
-  for (const table of PRODUCTION_BACKUP_TABLES) {
+  const countsAfter = await readCounts(binding, backupTables);
+  for (const table of backupTables) {
     if (countsBefore.get(table) !== countsAfter.get(table)) {
       throw new Error(`导出期间表 ${table} 行数发生变化，备份已终止`);
     }
@@ -247,13 +283,13 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
     tables: schemaTables,
     sqlite_schema: schemaResult.results.filter(
       (entry) =>
-        PRODUCTION_BACKUP_TABLES.includes(entry.table_name as ProductionBackupTable) ||
-        PRODUCTION_BACKUP_TABLES.includes(entry.name as ProductionBackupTable),
+        backupTables.includes(entry.table_name as ProductionBackupTable) ||
+        backupTables.includes(entry.name as ProductionBackupTable),
     ),
   });
   const schemaReadme = encoder.encode(
     `生产 D1 逻辑备份\n\nSchema version: ${schemaVersion}\n` +
-      `Tables: ${PRODUCTION_BACKUP_TABLES.length}\n` +
+      `Tables: ${backupTables.length}\n` +
       '此备份包含账号、会话、联系方式、密码哈希及完整族谱资料。请勿公开或提交到 Git。\n',
   );
   const checksums: Record<string, string> = {};

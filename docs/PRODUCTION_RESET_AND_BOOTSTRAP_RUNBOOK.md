@@ -8,6 +8,14 @@
 
 `action_idempotency`、`action_rate_limit`、`announcements`、`families`、`family_activities`、`family_users`、`generations`、`media`、`person_claims`、`phone_change_challenges`、`persons`、`relationships`、`review_requests`、`sms_verifications`、`system_audit_logs`、`user_identities`、`user_messages`、`user_sessions`、`users`。
 
+## 维护模式
+
+生产升级与 Reset 前必须先把服务端 MAINTENANCE_MODE 设置为 true。
+
+维护模式由 Worker 后端判定。普通族谱读取与全部业务写入均返回 HTTP 503 和稳定错误码 SERVICE_MAINTENANCE，避免旧数据泄露和维护窗口内继续写入。登录、退出、最小 health/status、SUPER_ADMIN 只读后台与生产备份保留；SUPER_ADMIN 也不能绕过维护模式执行普通业务写入。
+
+关闭维护模式必须显式把 MAINTENANCE_MODE 设置为 false。不能只隐藏前端按钮，也不能在未完成逐表计数、外键、旧 Session 失效和 Bootstrap 关闭验证前解除维护模式。
+
 ## Reset 实现方案
 
 核心实现在 `lib/production-lifecycle.ts`，不属于任何网站路由，不能被普通 HTTP 请求调用。
@@ -119,8 +127,8 @@ Reset 是不可逆业务操作。恢复只能来自执行前已经验证通过�
 1. 宣布维护窗口并启用服务端维护模式，禁止注册和全部写操作。
 2. 确认当前部署、项目 ID、D1 binding 和 schema 版本。
 3. 创建最终完整生产备份，保存到项目外且不进入 Git。
-4. 在全新本地 D1 完整恢复该备份，核对校验和、19 表行数和外键。
-5. 部署已通过测试的 S0 安全代码与最新 0000～0010。
+4. 在全新本地 D1 完整恢复当前 0006/16表 备份，核对校验和、逐表行数和外键。
+5. 部署已通过测试的 S0 安全代码、维护模式与最新 0000～0010；确认升级为19表后再创建一份新的19表备份并恢复验证。
 6. 再次确认生产仍在维护状态，配置短期 Reset Secret 和已验证备份 SHA-256。
 7. 部署临时、非公开的 Reset 运维入口，执行一次 Reset。
 8. 核对 19 表全部为 0、schema/索引仍存在、外键检查通过。

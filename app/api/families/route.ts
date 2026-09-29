@@ -1,5 +1,6 @@
 import { addPerson, addRelationship, claimPerson, createFamily, deleteFamily, ensureUser, getFamilyTree, getPersonDetail, joinFamily, listFamilies, reviewClaim, setMemberRole, updatePerson } from '../../../lib/family-store';
 import { runCreation, type CreationAction } from '../../../lib/creation-cooldown';
+import { maintenanceResponse } from '../../../lib/maintenance';
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
@@ -20,6 +21,8 @@ async function errorResponse(error: unknown) {
 }
 
 export async function GET(request: Request) {
+  const maintenance = maintenanceResponse();
+  if (maintenance) return maintenance;
   try {
     const user = await ensureUser(request);
     const familyId = new URL(request.url).searchParams.get('family_id');
@@ -33,6 +36,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const maintenance = maintenanceResponse();
+  if (maintenance) return maintenance;
   try {
     const user = await ensureUser(request);
     const body = await request.json() as Record<string, unknown>;
