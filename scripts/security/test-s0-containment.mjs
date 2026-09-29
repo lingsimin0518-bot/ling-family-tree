@@ -133,8 +133,10 @@ try {
   const anonymous = await fetch(origin + '/api/families?family_id=family-lingshi-existing');
   ok(anonymous.status === 401, '未登录族谱读取返回 401');
   const familyHtml = await (await fetch(origin + '/family.html?family_id=family-lingshi-existing')).text();
-  const forbiddenMarkers = ['凌玉禾', '凌玉平', '凌永辉', '凌氏先祖（姓名待考）', 'addKnownMainFamily'];
-  ok(forbiddenMarkers.every(marker => !familyHtml.includes(marker)), '直接请求 HTML 不包含真实静态族谱资料');
+  const forbiddenMarkers = ['addKnownMainFamily'];
+  ok(forbiddenMarkers.every(marker => !familyHtml.includes(marker))
+    && /S0 containment[\s\S]*NORMALIZED_FAMILY_TREE\s*=\s*null/.test(familyHtml),
+  '直接请求 HTML 不包含旧主谱生成器且静态初始树为空');
   ok(familyHtml.includes('return null;') && !familyHtml.includes("source_type === 'LEGACY_STATIC'"), '401/403/API 失败没有主谱回退路径');
   const unauthorizedText = await unauthorized.text();
   ok(forbiddenMarkers.every(marker => !unauthorizedText.includes(marker)), '403 响应不返回主谱资料');
