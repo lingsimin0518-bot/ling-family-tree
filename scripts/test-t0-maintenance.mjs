@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, pbkdf2Sync, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -12,8 +12,12 @@ const work = await mkdtemp(join(tmpdir(), 'maintenance-mode-test-'));
 const state = join(work, 'state');
 const config = join(work, 'wrangler.jsonc');
 const origin = 'http://127.0.0.1:8820';
-const superToken = 'local-maintenance-super-session';
-const superSessionId = createHash('sha256').update(superToken).digest('base64');
+const sessionTokens = {
+  super: 'local-maintenance-super-session',
+  user: 'local-maintenance-user-session',
+  owner: 'local-maintenance-owner-session',
+  admin: 'local-maintenance-admin-session',
+};
 let workerOutput = '';
 const migrations = [
   '0000_multi_family.sql',
@@ -110,7 +114,7 @@ async function startServer() {
   child.stdout.on('data', (chunk) => { workerOutput = (workerOutput + chunk.toString()).slice(-8000); });
   child.stderr.on('data', (chunk) => { workerOutput = (workerOutput + chunk.toString()).slice(-8000); });
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (child.exitCode !== null) throw new Error('本地维护模式 Worker 提前退出');
+    if (child.exitCode !== null) throw new Error(`本地维护模式 Worker 提前退出：\n${workerOutput}`);
     try {
       await fetch(origin + '/api/health');
       return child;
@@ -181,11 +185,16 @@ await writeFile(
   ledger,
   `CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);\n${migrations
     .map((name, index) => `INSERT INTO d1_migrations(id,name) VALUES(${index + 1},'${name}');`)
-    .join('\n')}\nUPDATE user_sessions SET id='${superSessionId}' WHERE user_id='u-super';\n`,
+    .join('\n')}\n${Object.entries(sessionTokens).map(([role, token]) =>
+      `UPDATE user_sessions SET id='${createHash('sha256').update(token).digest('base64')}' WHERE user_id='u-${role}';`,
+    ).join('\n')}\nUPDATE users SET password_hash='pbkdf2_sha256$100000$${Buffer.from('maintenance-salt').toString('base64')}$${pbkdf2Sync('local-test-password', 'maintenance-salt', 100_000, 32, 'sha256').toString('base64')}' WHERE id='u-super';\n`,
 );
 run([...d1, '--file', ledger]);
 
-const superCookie = `ling_session=${superToken}`;
+const superCookie = `ling_session=${sessionTokens.super}`;
+const userCookie = `ling_session=${sessionTokens.user}`;
+const ownerCookie = `ling_session=${sessionTokens.owner}`;
+const adminCookie = `ling_session=${sessionTokens.admin}`;
 let server = await startServer();
 try {
   let result = await request('/');
@@ -197,6 +206,22 @@ try {
   ok(result.response.status === 200 && typeof result.data === 'string' && !result.data.includes('凌玉禾') && !result.data.includes('凌氏先祖（姓名待考）') && !result.data.includes("|| 'family-lingshi-existing'"), '公开静态族谱 HTML 不包含真实人物或旧主谱回退');
   result = await request('/api/health');
   ok(result.response.status === 200 && result.data.status === 'maintenance', 'health 报告维护状态');
+  result = await request('/maintenance-admin');
+  ok(result.response.status === 200 && String(result.data).includes('管理员安全检查'), '维护期间管理员同源页面可访问');
+  result = await request('/api/admin/maintenance/overview');
+  ok(result.response.status === 401, '未登录不能读取维护期数据库概况');
+  for (const [role, cookie] of [['USER', userCookie], ['OWNER', ownerCookie], ['ADMIN', adminCookie]]) {
+    result = await request('/api/admin/maintenance/overview', 'GET', undefined, cookie);
+    ok(result.response.status === 403, `${role} 不能读取维护期数据库概况`);
+  }
+  result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
+  ok(result.response.status === 200 && result.data.schemaVersion === '0006' && result.data.tableCount === 16 && result.data.matchesExpected0006 === true && result.data.tables.length === 16, 'SUPER_ADMIN 可只读核对 0006 / 16 表');
+  ok(result.response.headers.get('cache-control') === 'private, no-store', '维护期数据库概况禁止缓存');
+  result = await request('/api/auth/login', 'POST', { username: 'super', password: 'local-test-password' });
+  ok(result.response.status === 200 && Boolean(result.response.headers.get('set-cookie')), '维护期间沿用原用户名密码登录');
+  const loginCookie = result.response.headers.get('set-cookie')?.split(';')[0] ?? '';
+  result = await request('/api/auth/session', 'GET', undefined, loginCookie);
+  ok(result.response.status === 200 && result.data.user?.systemRole === 'SUPER_ADMIN', '登录后须经原 Session 接口确认身份');
   result = await request('/api/auth/session');
   ok(result.response.status === 401, '维护期间未登录 Session 检查正常');
   result = await request('/api/auth/session', 'GET', undefined, superCookie);
@@ -236,6 +261,16 @@ try {
     );
   }
   console.log('检查维护模式下的SUPER_ADMIN运维边界…');
+  /** @type {Array<[string, Record<string, unknown>]>} */
+  const adminBlockedRequests = [
+    ['/api/families', { action: 'CREATE_FAMILY' }],
+    ['/api/announcements', {}],
+    ['/api/reviews', {}],
+  ];
+  for (const [path, body] of adminBlockedRequests) {
+    result = await request(path, 'POST', body, superCookie);
+    ok(result.response.status === 503 && result.data.code === 'SERVICE_MAINTENANCE', `SUPER_ADMIN 不能绕过 ${path} 的维护门禁`);
+  }
   result = await request('/api/admin', 'POST', { action: 'FORCE_LOGOUT' }, superCookie);
   ok(
     result.response.status === 503 && result.data.code === 'SERVICE_MAINTENANCE',
@@ -243,6 +278,10 @@ try {
   );
   result = await request('/api/admin/backups/export', 'POST');
   ok(result.response.status === 401, '未登录不能导出生产备份');
+  for (const [role, cookie] of [['USER', userCookie], ['OWNER', ownerCookie], ['ADMIN', adminCookie]]) {
+    result = await request('/api/admin/backups/export', 'POST', undefined, cookie);
+    ok(result.response.status === 403, `${role} 不能导出生产备份`);
+  }
   result = await request('/api/admin/backups/export', 'POST', undefined, superCookie);
   ok(result.response.status === 200 && result.response.headers.get('content-type')?.includes('application/zip') && typeof result.data === 'string' && result.data.length > 0, `维护期间 SUPER_ADMIN 可导出完整 ZIP（状态 ${result.response.status}，类型 ${result.response.headers.get('content-type')}，响应长度 ${typeof result.data === 'string' ? result.data.length : 0}）`);
   const adminRoute = await readFile(join(root, 'app', 'api', 'admin', 'route.ts'), 'utf8');
@@ -270,6 +309,10 @@ server = await startServer();
 try {
   let result = await request('/api/health');
   ok(result.response.status === 200 && result.data.status === 'operational', '关闭维护模式后 health 恢复');
+  result = await request('/maintenance-admin');
+  ok(result.response.status === 404, '维护模式关闭后维护期管理员页面不存在');
+  result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
+  ok(result.response.status === 404, '维护模式关闭后专用数据库概况接口不存在');
   for (const [label, email] of [
     ['无密码普通旧账号', 'legacy-user@example.test'],
     ['无密码 SUPER_ADMIN 旧账号', 'legacy-super@example.test'],
