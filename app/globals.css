@@ -23,3 +23,4 @@ body {
 @media(max-width:650px){.first-use-actions{grid-template-columns:1fr}.family-state{justify-content:flex-start;padding-top:12vh;overflow:auto}.first-use-actions article{padding:17px}}
 @media(prefers-reduced-motion:reduce){.loading-seal,.family-skeleton i{animation:none}}
 button:disabled{opacity:.58;cursor:not-allowed}
+.maintenance-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 28%,#fff9ed,#f3e6d0);color:#39261c}.maintenance-card{width:min(640px,100%);padding:clamp(30px,6vw,58px);border:2px solid #cda65e;border-radius:20px;background:#fffaf1;text-align:center;box-shadow:0 18px 48px #6e321b22}.maintenance-card h1{font:700 clamp(32px,5vw,48px) serif;color:#8f2926}.maintenance-card p{font-size:17px;line-height:1.8}.maintenance-eyebrow{color:#a36d28;letter-spacing:.2em}

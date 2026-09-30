@@ -11,7 +11,7 @@ function backupFilename(date = new Date()) {
     .replace(/[-:]/g, '')
     .replace('T', '-')
     .replace(/\.\d{3}Z$/, 'Z');
-  return `production-before-0006-${stamp}.zip`;
+  return `production-schema-0006-${stamp}.zip`;
 }
 
 function failure(message: string, status: number) {

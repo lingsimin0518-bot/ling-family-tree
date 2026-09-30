@@ -7,13 +7,16 @@ export const PRODUCTION_BACKUP_TABLES = [
   'action_rate_limit',
   'announcements',
   'families',
+  'family_activities',
   'family_users',
   'generations',
   'media',
   'person_claims',
   'persons',
   'relationships',
+  'review_requests',
   'system_audit_logs',
+  'user_messages',
   'user_sessions',
   'users',
 ] as const;
@@ -162,20 +165,24 @@ export type ProductionBackup = {
 export async function createProductionBackup(): Promise<ProductionBackup> {
   const binding = db();
   const exportStartedAt = new Date().toISOString();
-  const countsBefore = await readCounts(binding);
   const schemaResult = await binding
     .prepare(`SELECT type,name,tbl_name AS table_name,sql FROM sqlite_schema
       WHERE type IN ('table','index') ORDER BY type,name`)
     .all<SchemaObject>();
   const schemaNames = new Set(schemaResult.results.map((entry) => entry.name));
+  const actualTables = schemaResult.results
+    .filter((entry) => entry.type === 'table' && !entry.name.startsWith('sqlite_') && entry.name !== 'd1_migrations' && entry.name !== '_cf_KV' && entry.name !== '_cf_METADATA')
+    .map((entry) => entry.name);
   const missingTables = PRODUCTION_BACKUP_TABLES.filter(
     (table) => !schemaNames.has(table),
   );
-  if (missingTables.length > 0) {
-    throw new Error(`生产数据库缺少备份表：${missingTables.join('、')}`);
+  const extraTables = actualTables.filter((table) => !PRODUCTION_BACKUP_TABLES.includes(table as ProductionBackupTable));
+  if (missingTables.length > 0 || extraTables.length > 0) {
+    throw new Error(`生产数据库与 0006/16 表备份白名单不一致：缺少 ${missingTables.join('、') || '无'}；多出 ${extraTables.join('、') || '无'}`);
   }
-
   const schemaVersion = await readSchemaVersion(binding, schemaNames);
+  if (schemaVersion !== '0006') throw new Error(`生产数据库不是预期的 0006 结构：${schemaVersion}`);
+  const countsBefore = await readCounts(binding);
   const tableFiles: BackupArchiveFile[] = [];
   const tableManifests: TableManifest[] = [];
   const schemaTables: Record<string, ColumnInfo[]> = {};

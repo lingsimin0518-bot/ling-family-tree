@@ -14,16 +14,7 @@ function db() {
 }
 
 export async function ensureUser(request: Request) {
-  const user = await requireUser(request);
-  const now = new Date().toISOString();
-  await db().batch([
-    db().prepare("INSERT OR IGNORE INTO families (id,name,description,join_code,source_type,created_by,created_at) VALUES (?,?,?,?,?,?,?)").bind(LEGACY_FAMILY_ID, '凌氏家谱', '保留的原有凌氏家谱', 'LINGSHI', 'LEGACY_STATIC', user.id, now),
-  ]);
-  const owner = await db().prepare('SELECT user_id FROM family_users WHERE family_id=? LIMIT 1').bind(LEGACY_FAMILY_ID).first();
-  if (!owner) {
-    await db().prepare('INSERT INTO family_users (user_id,family_id,role,joined_at) VALUES (?,?,?,?)').bind(user.id, LEGACY_FAMILY_ID, 'OWNER', now).run();
-  }
-  return user;
+  return requireUser(request);
 }
 
 export async function membership(userId: string, familyId: string) {
@@ -33,7 +24,9 @@ export async function membership(userId: string, familyId: string) {
 }
 
 export async function listFamilies(userId: string) {
-  const result = await db().prepare(`SELECT f.id,f.name,f.description,f.join_code,f.source_type,fu.role,fu.joined_at
+  const result = await db().prepare(`SELECT f.id,f.name,f.description,
+    CASE WHEN fu.role IN ('OWNER','ADMIN') AND f.source_type='DATABASE' THEN f.join_code ELSE NULL END join_code,
+    f.source_type,fu.role,fu.joined_at
     FROM families f JOIN family_users fu ON fu.family_id=f.id
     WHERE fu.user_id=? ORDER BY fu.joined_at`).bind(userId).all();
   return result.results;
@@ -51,7 +44,7 @@ export async function createFamily(userId: string, name: string, description = '
 }
 
 export async function joinFamily(userId: string, code: string) {
-  const family = await db().prepare('SELECT id,name FROM families WHERE join_code=?').bind(code.trim().toUpperCase()).first<{ id: string; name: string }>();
+  const family = await db().prepare("SELECT id,name FROM families WHERE join_code=? AND source_type='DATABASE'").bind(code.trim().toUpperCase()).first<{ id: string; name: string }>();
   if (!family) throw new Response('未找到对应族谱，请检查加入码', { status: 404 });
   await db().prepare("INSERT OR IGNORE INTO family_users (user_id,family_id,role,joined_at) VALUES (?,?, 'VIEWER', ?)").bind(userId, family.id, new Date().toISOString()).run();
   return family;
@@ -74,8 +67,11 @@ export async function getFamilyTree(userId: string, familyId: string) {
   const role = await membership(userId, familyId);
   const binding = db();
   const canReview = role === 'OWNER' || role === 'ADMIN';
+  const familySql = canReview
+    ? "SELECT id,name,description,CASE WHEN source_type='DATABASE' THEN join_code ELSE NULL END join_code,source_type FROM families WHERE id=?"
+    : 'SELECT id,name,description,NULL join_code,source_type FROM families WHERE id=?';
   const [family, people, relationships, generations, announcements, media, claims, members] = await Promise.all([
-    binding.prepare('SELECT id,name,description,join_code,source_type FROM families WHERE id=?').bind(familyId).first(),
+    binding.prepare(familySql).bind(familyId).first(),
     binding.prepare('SELECT * FROM persons WHERE family_id=? ORDER BY generation,birth_year,name').bind(familyId).all(),
     binding.prepare('SELECT * FROM relationships WHERE family_id=?').bind(familyId).all(),
     binding.prepare('SELECT * FROM generations WHERE family_id=? ORDER BY number').bind(familyId).all(),

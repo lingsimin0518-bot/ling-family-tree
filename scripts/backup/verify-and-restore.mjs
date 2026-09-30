@@ -10,13 +10,16 @@ const TABLES = [
   'action_rate_limit',
   'announcements',
   'families',
+  'family_activities',
   'family_users',
   'generations',
   'media',
   'person_claims',
   'persons',
   'relationships',
+  'review_requests',
   'system_audit_logs',
+  'user_messages',
   'user_sessions',
   'users',
 ];
@@ -28,8 +31,11 @@ const IMPORT_ORDER = [
   'persons',
   'relationships',
   'announcements',
+  'family_activities',
   'media',
   'person_claims',
+  'review_requests',
+  'user_messages',
   'system_audit_logs',
   'user_sessions',
   'action_rate_limit',
@@ -184,20 +190,24 @@ async function main() {
     manifest.backup_format_version !== 1 ||
     manifest.project_id !== 'appgprj_6a9b746cbba88191bd63914f864ffb5e' ||
     manifest.binding !== 'DB' ||
-    manifest.schema_version !== '0005' ||
+    manifest.schema_version !== '0006' ||
     !Array.isArray(manifest.tables)
   ) {
-    fail('manifest 与当前 0006 前生产备份要求不匹配');
+    fail('manifest 与当前 0006/16 表生产备份要求不匹配');
   }
   const manifestTables = manifest.tables.map((entry) => entry.table_name);
   if (
     manifestTables.length !== TABLES.length ||
     TABLES.some((table) => !manifestTables.includes(table))
   ) {
-    fail('manifest 没有完整列出13张表');
+    fail('manifest 没有完整列出16张表');
   }
 
   const checksums = parseJson(files, 'checksums.json');
+  const requiredChecksums = [...REQUIRED_FILES].filter((path) => path !== 'manifest.json' && path !== 'checksums.json');
+  if (Object.keys(checksums).length !== requiredChecksums.length || requiredChecksums.some((path) => typeof checksums[path] !== 'string')) {
+    fail('校验和清单没有完整列出所有备份文件');
+  }
   for (const [path, expected] of Object.entries(checksums)) {
     const bytes = files.get(path);
     if (!bytes || sha256(bytes) !== expected) fail(`SHA-256 校验失败：${path}`);
@@ -234,7 +244,7 @@ async function main() {
     '--persist-to',
     state,
   ];
-  for (let version = 0; version <= 5; version += 1) {
+  for (let version = 0; version <= 6; version += 1) {
     const prefix = String(version).padStart(4, '0');
     const migration = [
       '0000_multi_family.sql',
@@ -243,6 +253,7 @@ async function main() {
       '0003_system_admin.sql',
       '0004_unified_person_operations.sql',
       '0005_creation_cooldown.sql',
+      '0006_collaboration_persistence.sql',
     ][version];
     if (!migration.startsWith(prefix)) fail('migration 顺序配置错误');
     runWrangler([...baseArgs, '--file', join(projectRoot, 'drizzle', migration)]);
@@ -278,7 +289,7 @@ async function main() {
     console.log(`${result.pass ? 'PASS' : 'FAIL'} ${result.table}: ${result.actual}/${result.expected}`);
   }
   if (results.some((result) => !result.pass)) fail('一个或多个表的行数不一致');
-  console.log('PASS：备份结构、校验和、本地恢复、13张表行数和外键检查全部通过。');
+  console.log('PASS：备份结构、校验和、本地恢复、16张表行数和外键检查全部通过。');
   console.log(`隔离的本地验证目录：${work}`);
 }
 

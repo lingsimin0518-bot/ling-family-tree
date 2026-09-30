@@ -10,15 +10,17 @@
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "backup:verify": "node scripts/backup/verify-and-restore.mjs",
+    "backup:test-fixture": "node --experimental-strip-types scripts/backup/test-local-backup.mjs",
+    "test:t0-maintenance": "node scripts/test-t0-maintenance.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "pinyin-pro": "^3.29.3",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "react-server-dom-webpack": "19.2.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-server-dom-webpack": "19.2.8",
     "vinext": "1.0.0-beta.5"
   },
   "devDependencies": {
@@ -37,7 +39,7 @@
     "oxlint-tsgolint": "7.0.2001",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vite": "8.0.13",
+    "vite": "8.0.16",
     "wrangler": "4.92.0"
   },
   "type": "module"

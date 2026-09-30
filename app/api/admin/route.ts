@@ -1,4 +1,5 @@
 import { adminFamilies, adminLogs, adminOverview, adminUserDetail, adminUsers, updateUserStatus } from '../../../lib/admin-store';
+import { maintenanceResponse } from '../../../lib/maintenance';
 
 function json(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}})}
 function toText(value:unknown){
@@ -25,6 +26,8 @@ export async function GET(request:Request){
 }
 
 export async function POST(request:Request){
+  const maintenance=maintenanceResponse();
+  if(maintenance)return maintenance;
   try{
     const body=await request.json() as Record<string,unknown>;
     const action=toText(body.action);
