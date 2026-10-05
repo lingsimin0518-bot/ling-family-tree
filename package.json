@@ -12,6 +12,7 @@
     "backup:verify": "node scripts/backup/verify-and-restore.mjs",
     "backup:test-fixture": "node --experimental-strip-types scripts/backup/test-local-backup.mjs",
     "test:t0-maintenance": "node scripts/test-t0-maintenance.mjs",
+    "test:t0-schema": "node --experimental-strip-types scripts/test-t0-schema-classification.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
   },

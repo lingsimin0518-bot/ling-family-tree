@@ -1,27 +1,14 @@
 import { env } from 'cloudflare:workers';
 import hostingConfig from '../.openai/hosting.json';
 import type { BackupArchiveFile } from './backup-archive';
+import {
+  inspectProductionSchema,
+  PRODUCTION_BACKUP_TABLES,
+  type ProductionBackupTable,
+  type SchemaRecognitionMethod,
+} from './production-schema';
 
-export const PRODUCTION_BACKUP_TABLES = [
-  'action_idempotency',
-  'action_rate_limit',
-  'announcements',
-  'families',
-  'family_activities',
-  'family_users',
-  'generations',
-  'media',
-  'person_claims',
-  'persons',
-  'relationships',
-  'review_requests',
-  'system_audit_logs',
-  'user_messages',
-  'user_sessions',
-  'users',
-] as const;
-
-export type ProductionBackupTable = (typeof PRODUCTION_BACKUP_TABLES)[number];
+export { PRODUCTION_BACKUP_TABLES } from './production-schema';
 
 type ColumnInfo = {
   cid: number;
@@ -49,6 +36,7 @@ type TableManifest = {
 export type ProductionBackupManifest = {
   backup_format_version: 1;
   schema_version: string;
+  schema_recognition_method: SchemaRecognitionMethod;
   export_started_at: string;
   export_finished_at: string;
   project_id: string;
@@ -61,6 +49,7 @@ const MAX_TABLE_JSON_BYTES = 16 * 1024 * 1024;
 const MAX_TOTAL_JSON_BYTES = 48 * 1024 * 1024;
 
 export class BackupLimitError extends Error {}
+export class BackupSchemaMismatchError extends Error {}
 
 function db() {
   const binding = (env as unknown as { DB?: D1Database }).DB;
@@ -130,33 +119,6 @@ async function readCounts(binding: D1Database) {
   );
 }
 
-async function readSchemaVersion(binding: D1Database, schemaNames: Set<string>) {
-  if (schemaNames.has('d1_migrations')) {
-    const columns = await binding.prepare('PRAGMA table_info("d1_migrations")').all<ColumnInfo>();
-    if (columns.results.some((column) => column.name === 'name')) {
-      const row = await binding
-        .prepare('SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1')
-        .first<{ name: string }>();
-      const match = row?.name?.match(/^(\d{4})/);
-      if (match) return match[1];
-    }
-  }
-
-  if (
-    schemaNames.has('family_activities') &&
-    schemaNames.has('review_requests') &&
-    schemaNames.has('user_messages')
-  ) {
-    return '0006';
-  }
-  if (schemaNames.has('action_rate_limit') && schemaNames.has('action_idempotency')) {
-    return '0005';
-  }
-  if (schemaNames.has('system_audit_logs')) return '0003-or-0004';
-  if (schemaNames.has('user_sessions')) return '0001-or-0002';
-  return '0000';
-}
-
 export type ProductionBackup = {
   manifest: ProductionBackupManifest;
   files: BackupArchiveFile[];
@@ -169,19 +131,11 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
     .prepare(`SELECT type,name,tbl_name AS table_name,sql FROM sqlite_schema
       WHERE type IN ('table','index') ORDER BY type,name`)
     .all<SchemaObject>();
-  const schemaNames = new Set(schemaResult.results.map((entry) => entry.name));
-  const actualTables = schemaResult.results
-    .filter((entry) => entry.type === 'table' && !entry.name.startsWith('sqlite_') && entry.name !== 'd1_migrations' && entry.name !== '_cf_KV' && entry.name !== '_cf_METADATA')
-    .map((entry) => entry.name);
-  const missingTables = PRODUCTION_BACKUP_TABLES.filter(
-    (table) => !schemaNames.has(table),
-  );
-  const extraTables = actualTables.filter((table) => !PRODUCTION_BACKUP_TABLES.includes(table as ProductionBackupTable));
-  if (missingTables.length > 0 || extraTables.length > 0) {
-    throw new Error(`生产数据库与 0006/16 表备份白名单不一致：缺少 ${missingTables.join('、') || '无'}；多出 ${extraTables.join('、') || '无'}`);
+  const inspection = await inspectProductionSchema(binding);
+  if (!inspection.matchesExpected0006) {
+    throw new BackupSchemaMismatchError(`生产数据库与 0006/16 表备份白名单不一致：缺少 ${inspection.missingTables.join('、') || '无'}；未知额外表 ${inspection.unknownTables.join('、') || '无'}；结构版本 ${inspection.schemaVersion}`);
   }
-  const schemaVersion = await readSchemaVersion(binding, schemaNames);
-  if (schemaVersion !== '0006') throw new Error(`生产数据库不是预期的 0006 结构：${schemaVersion}`);
+  const schemaVersion = inspection.schemaVersion;
   const countsBefore = await readCounts(binding);
   const tableFiles: BackupArchiveFile[] = [];
   const tableManifests: TableManifest[] = [];
@@ -226,9 +180,14 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
       throw new Error(`导出期间表 ${table} 行数发生变化，备份已终止`);
     }
   }
+  const inspectionAfter = await inspectProductionSchema(binding);
+  if (!inspectionAfter.matchesExpected0006 || inspectionAfter.schemaVersion !== schemaVersion || inspectionAfter.businessTables.join('|') !== inspection.businessTables.join('|')) {
+    throw new BackupSchemaMismatchError('导出期间数据库结构发生变化，备份已终止');
+  }
 
   const schemaJson = jsonBytes({
     schema_version: schemaVersion,
+    schema_recognition_method: inspection.schemaRecognitionMethod,
     tables: schemaTables,
     sqlite_schema: schemaResult.results.filter(
       (entry) =>
@@ -250,6 +209,7 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
   const manifest: ProductionBackupManifest = {
     backup_format_version: 1,
     schema_version: schemaVersion,
+    schema_recognition_method: inspection.schemaRecognitionMethod,
     export_started_at: exportStartedAt,
     export_finished_at: new Date().toISOString(),
     project_id: hostingConfig.project_id,

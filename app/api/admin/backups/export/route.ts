@@ -1,6 +1,7 @@
 import { createStoredZipStream } from '../../../../../lib/backup-archive';
 import {
   BackupLimitError,
+  BackupSchemaMismatchError,
   createProductionBackup,
 } from '../../../../../lib/production-backup';
 import { requireSuperAdmin } from '../../../../../lib/auth';
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       return failure(await error.text(), error.status);
     }
     if (error instanceof BackupLimitError) return failure(error.message, 413);
+    if (error instanceof BackupSchemaMismatchError) return failure(error.message, 409);
     // Do not log row contents or the original error object: it can contain sensitive data.
     console.error('production backup export failed');
     return failure('生产备份生成失败，未返回不完整文件', 500);

@@ -112,6 +112,7 @@ async function main() {
     '--file',
     join(projectRoot, 'scripts', 'backup', 'fixtures', profile.fixture),
   ]);
+  runWrangler([...base, '--command', 'CREATE TABLE __appgarden_migrations(id INTEGER PRIMARY KEY, opaque_record TEXT)']);
 
   const schemaRows = resultRows(
     runWrangler([
@@ -145,6 +146,7 @@ async function main() {
 
   const schemaJson = jsonBytes({
     schema_version: schemaVersion,
+    schema_recognition_method: 'structural_inference',
     tables: schemaTables,
     sqlite_schema: schemaRows.filter(
       (entry) => profile.tables.includes(entry.table_name) || profile.tables.includes(entry.name),
@@ -162,6 +164,7 @@ async function main() {
   const manifest = {
     backup_format_version: 1,
     schema_version: schemaVersion,
+    schema_recognition_method: 'structural_inference',
     export_started_at: now,
     export_finished_at: now,
     project_id: 'appgprj_6a9b746cbba88191bd63914f864ffb5e',

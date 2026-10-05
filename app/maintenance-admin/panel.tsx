@@ -10,8 +10,12 @@ type SessionUser = {
 
 type Overview = {
   schemaVersion: string;
+  schemaRecognitionMethod: 'd1_migrations' | 'sites_migration_record' | 'structural_inference' | 'unrecognized';
   tableCount: number;
   tables: string[];
+  platformTables: string[];
+  unknownTables: string[];
+  missingTables: string[];
   matchesExpected0006: boolean;
 };
 
@@ -197,9 +201,12 @@ export default function MaintenanceAdminPanel() {
       <section><h2>只读数据库概况</h2>
         {overviewState === 'error' && <p className="status error">无法读取数据库概况，请刷新重试。</p>}
         {!overview && overviewState !== 'error' && <p className="status">正在读取表和结构版本…</p>}
-        {overview && <><dl><dt>结构版本</dt><dd>{overview.schemaVersion}</dd><dt>业务表数量</dt><dd>{overview.tableCount}</dd>
+        {overview && <><dl><dt>结构版本</dt><dd>{overview.schemaVersion}{overview.schemaRecognitionMethod === 'structural_inference' ? '（推断）' : ''}</dd><dt>业务表数量</dt><dd>{overview.tableCount}</dd>
           <dt>0006 / 16 表核对</dt><dd>{overview.matchesExpected0006 && overview.schemaVersion === '0006' ? '一致' : '异常，请停止备份和验收'}</dd></dl>
-          <p className="muted">表名：{overview.tables.join('、')}</p></>}</section>
+          <p className="muted">业务表：{overview.tables.join('、')}</p>
+          <p className="muted">平台内部表（不计入业务表或备份）：{overview.platformTables.join('、') || '无'}</p>
+          {overview.missingTables.length > 0 && <p className="status error">缺少业务表：{overview.missingTables.join('、')}</p>}
+          {overview.unknownTables.length > 0 && <p className="status error">未知额外表：{overview.unknownTables.join('、')}。已停止备份，请人工确认。</p>}</>}</section>
       <section><h2>维护模式写入阻断验收</h2>
         <p>从本站逐项发起缺少有效业务参数的测试请求。每项必须返回 HTTP 503 和 SERVICE_MAINTENANCE；遇到异常立即停止后续请求。</p>
         <button type="button" onClick={runWriteProbes} disabled={probeBusy || health !== 'maintenance' || !overview?.matchesExpected0006 || overview.schemaVersion !== '0006'}>{probeBusy ? '正在检查…' : '检查业务写入是否全部被阻止'}</button>

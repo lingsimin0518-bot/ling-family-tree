@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { requireSuperAdmin } from '../../../../../lib/auth';
 import { isMaintenanceMode } from '../../../../../lib/maintenance';
-import { PRODUCTION_BACKUP_TABLES } from '../../../../../lib/production-backup';
+import { inspectProductionSchema } from '../../../../../lib/production-schema';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
 
@@ -15,27 +15,17 @@ export async function GET(request: Request) {
     const binding = (env as unknown as { DB?: D1Database }).DB;
     if (!binding) throw new Error('数据库未绑定');
 
-    const result = await binding.prepare(`SELECT name FROM sqlite_schema
-      WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-      AND name NOT IN ('d1_migrations', '_cf_KV', '_cf_METADATA')
-      ORDER BY name`).all<{ name: string }>();
-    const tables = result.results.map((row) => row.name);
-    const expectedTables = [...PRODUCTION_BACKUP_TABLES].sort();
-    const matchesExpected0006 = tables.length === expectedTables.length &&
-      tables.every((table, index) => table === expectedTables[index]);
-
-    const migrations = await binding.prepare(`SELECT name FROM sqlite_schema
-      WHERE type = 'table' AND name = 'd1_migrations'`).first<{ name: string }>();
-    const latestMigration = migrations
-      ? await binding.prepare('SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1').first<{ name: string }>()
-      : null;
-    const schemaVersion = latestMigration?.name?.match(/^(\d{4})/)?.[1] ?? '未记录';
+    const inspection = await inspectProductionSchema(binding);
 
     return Response.json({
-      schemaVersion,
-      tableCount: tables.length,
-      tables,
-      matchesExpected0006,
+      schemaVersion: inspection.schemaVersion,
+      schemaRecognitionMethod: inspection.schemaRecognitionMethod,
+      tableCount: inspection.businessTables.length,
+      tables: inspection.businessTables,
+      platformTables: inspection.platformTables,
+      unknownTables: inspection.unknownTables,
+      missingTables: inspection.missingTables,
+      matchesExpected0006: inspection.matchesExpected0006,
     }, { headers: NO_STORE });
   } catch (error) {
     if (error instanceof Response) {

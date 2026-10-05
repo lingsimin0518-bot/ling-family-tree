@@ -171,6 +171,52 @@ async function request(path, method = 'GET', body, cookie = '') {
   throw new Error('本地 Worker 重启后请求仍未返回');
 }
 
+function storedZipEntries(bytes) {
+  const files = new Map();
+  const decoder = new TextDecoder();
+  let offset = 0;
+  while (offset + 4 <= bytes.length) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset + offset);
+    const signature = view.getUint32(0, true);
+    if (signature === 0x02014b50 || signature === 0x06054b50) break;
+    if (signature !== 0x04034b50 || offset + 30 > bytes.length) throw new Error('本地备份 ZIP 结构无效');
+    const size = view.getUint32(18, true);
+    const nameLength = view.getUint16(26, true);
+    const extraLength = view.getUint16(28, true);
+    const dataStart = offset + 30 + nameLength + extraLength;
+    const end = dataStart + size;
+    if (end > bytes.length) throw new Error('本地备份 ZIP 不完整');
+    const name = decoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
+    files.set(name, bytes.subarray(dataStart, end));
+    offset = end;
+  }
+  return files;
+}
+
+async function checkLocalExport(cookie) {
+  const response = await fetch(origin + '/api/admin/backups/export', {
+    method: 'POST',
+    headers: { cookie },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (response.status !== 200) throw new Error(`本地导出返回 HTTP ${response.status}`);
+  const files = storedZipEntries(new Uint8Array(await response.arrayBuffer()));
+  const expected = new Set([
+    'manifest.json', 'checksums.json', 'schema/schema.json', 'schema/README.md',
+    ...[
+      'action_idempotency', 'action_rate_limit', 'announcements', 'families',
+      'family_activities', 'family_users', 'generations', 'media', 'person_claims',
+      'persons', 'relationships', 'review_requests', 'system_audit_logs',
+      'user_messages', 'user_sessions', 'users',
+    ].map((name) => `tables/${name}.json`),
+  ]);
+  ok(files.size === expected.size && [...files.keys()].every((name) => expected.has(name)), '实际本地导出 ZIP 恰好包含 16 张业务表，无平台元数据表');
+  const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')));
+  ok(manifest.schema_version === '0006' && manifest.schema_recognition_method === 'structural_inference' && manifest.tables.length === 16, '实际本地导出 manifest 标明 0006（结构推断）及 16 张业务表');
+  const checksums = JSON.parse(new TextDecoder().decode(files.get('checksums.json')));
+  ok(Object.entries(checksums).every(([path, expectedHash]) => files.has(path) && createHash('sha256').update(files.get(path)).digest('hex') === expectedHash), '实际本地导出 ZIP 的所有 SHA-256 校验通过');
+}
+
 await writeConfig(true);
 for (const migration of migrations) run([...d1, '--file', join(root, 'drizzle', migration)]);
 run([...d1, '--file', join(root, 'scripts', 'backup', 'fixtures', 'local-test-data.sql')]);
@@ -180,12 +226,10 @@ await writeFile(legacySeed, `INSERT INTO users(id,email,display_name,created_at,
 ('legacy-super','legacy-super@example.test','Legacy super','2026-01-01T00:00:00Z','legacy_super',NULL,'ACTIVE','2026-01-01T00:00:00Z','SUPER_ADMIN'),
 ('legacy-disabled','legacy-disabled@example.test','Legacy disabled','2026-01-01T00:00:00Z','legacy_disabled',NULL,'DISABLED','2026-01-01T00:00:00Z','USER');`);
 run([...d1, '--file', legacySeed]);
-const ledger = join(work, 'migration-ledger.sql');
+const ledger = join(work, 'sites-metadata-and-sessions.sql');
 await writeFile(
   ledger,
-  `CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);\n${migrations
-    .map((name, index) => `INSERT INTO d1_migrations(id,name) VALUES(${index + 1},'${name}');`)
-    .join('\n')}\n${Object.entries(sessionTokens).map(([role, token]) =>
+  `CREATE TABLE __appgarden_migrations(id INTEGER PRIMARY KEY, opaque_record TEXT NOT NULL);\nINSERT INTO __appgarden_migrations(id,opaque_record) VALUES(1,'unrecognized-platform-format');\n${Object.entries(sessionTokens).map(([role, token]) =>
       `UPDATE user_sessions SET id='${createHash('sha256').update(token).digest('base64')}' WHERE user_id='u-${role}';`,
     ).join('\n')}\nUPDATE users SET password_hash='pbkdf2_sha256$100000$${Buffer.from('maintenance-salt').toString('base64')}$${pbkdf2Sync('local-test-password', 'maintenance-salt', 100_000, 32, 'sha256').toString('base64')}' WHERE id='u-super';\n`,
 );
@@ -215,7 +259,7 @@ try {
     ok(result.response.status === 403, `${role} 不能读取维护期数据库概况`);
   }
   result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
-  ok(result.response.status === 200 && result.data.schemaVersion === '0006' && result.data.tableCount === 16 && result.data.matchesExpected0006 === true && result.data.tables.length === 16, 'SUPER_ADMIN 可只读核对 0006 / 16 表');
+  ok(result.response.status === 200 && result.data.schemaVersion === '0006' && result.data.schemaRecognitionMethod === 'structural_inference' && result.data.tableCount === 16 && result.data.matchesExpected0006 === true && result.data.tables.length === 16 && result.data.platformTables.includes('__appgarden_migrations'), 'A：Sites 元数据单列且结构版本明确标记为 0006（推断），16 张业务表可备份');
   ok(result.response.headers.get('cache-control') === 'private, no-store', '维护期数据库概况禁止缓存');
   result = await request('/api/auth/login', 'POST', { username: 'super', password: 'local-test-password' });
   ok(result.response.status === 200 && Boolean(result.response.headers.get('set-cookie')), '维护期间沿用原用户名密码登录');
@@ -284,6 +328,16 @@ try {
   }
   result = await request('/api/admin/backups/export', 'POST', undefined, superCookie);
   ok(result.response.status === 200 && result.response.headers.get('content-type')?.includes('application/zip') && typeof result.data === 'string' && result.data.length > 0, `维护期间 SUPER_ADMIN 可导出完整 ZIP（状态 ${result.response.status}，类型 ${result.response.headers.get('content-type')}，响应长度 ${typeof result.data === 'string' ? result.data.length : 0}）`);
+  await checkLocalExport(superCookie);
+  result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
+  ok(result.response.status === 200 && result.data.tableCount === 16 && result.data.matchesExpected0006 && result.data.platformTables.includes('_cf_METADATA') && result.data.platformTables.includes('__appgarden_migrations'), 'B：_cf_METADATA 与 Sites migration 元数据均不计入 16 张业务表');
+  result = await request('/api/admin/backups/export', 'POST', undefined, superCookie);
+  ok(result.response.status === 200 && result.response.headers.get('content-type')?.includes('application/zip'), 'B：两个已知平台表同时存在时仍允许严格 16 表备份');
+  run([...d1, '--command', 'CREATE TABLE unexpected_table(id TEXT PRIMARY KEY)']);
+  result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
+  ok(result.response.status === 200 && !result.data.matchesExpected0006 && result.data.unknownTables.includes('unexpected_table'), 'C：维护页显式报告未知额外表并禁用备份');
+  result = await request('/api/admin/backups/export', 'POST', undefined, superCookie);
+  ok(result.response.status === 409 && result.data.error.includes('unexpected_table'), 'C：未知额外表使备份 fail closed，且安全报告表名');
   const adminRoute = await readFile(join(root, 'app', 'api', 'admin', 'route.ts'), 'utf8');
   const backupRoute = await readFile(
     join(root, 'app', 'api', 'admin', 'backups', 'export', 'route.ts'),

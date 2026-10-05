@@ -191,6 +191,7 @@ async function main() {
     manifest.project_id !== 'appgprj_6a9b746cbba88191bd63914f864ffb5e' ||
     manifest.binding !== 'DB' ||
     manifest.schema_version !== '0006' ||
+    !['d1_migrations', 'sites_migration_record', 'structural_inference'].includes(manifest.schema_recognition_method) ||
     !Array.isArray(manifest.tables)
   ) {
     fail('manifest 与当前 0006/16 表生产备份要求不匹配');
@@ -201,6 +202,13 @@ async function main() {
     TABLES.some((table) => !manifestTables.includes(table))
   ) {
     fail('manifest 没有完整列出16张表');
+  }
+  const schema = parseJson(files, 'schema/schema.json');
+  if (schema.schema_version !== manifest.schema_version || schema.schema_recognition_method !== manifest.schema_recognition_method || Object.keys(schema.tables ?? {}).length !== TABLES.length || TABLES.some((table) => !Object.hasOwn(schema.tables, table))) {
+    fail('schema 文件与 manifest 的版本、识别方式或16张表不一致');
+  }
+  if (schema.sqlite_schema?.some((entry) => !TABLES.includes(entry.table_name) && !TABLES.includes(entry.name))) {
+    fail('schema 文件包含平台内部表或未知表');
   }
 
   const checksums = parseJson(files, 'checksums.json');
