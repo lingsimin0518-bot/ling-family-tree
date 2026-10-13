@@ -10,6 +10,7 @@ type SessionUser = {
 
 type Overview = {
   schemaVersion: string;
+  profileVersion: '0006' | '0010';
   schemaRecognitionMethod: 'd1_migrations' | 'sites_migration_record' | 'structural_inference' | 'unrecognized';
   tableCount: number;
   tables: string[];
@@ -17,6 +18,8 @@ type Overview = {
   unknownTables: string[];
   missingTables: string[];
   matchesExpected0006: boolean;
+  matchesExpected0010: boolean;
+  matchesExpectedBackup: boolean;
 };
 
 type ProbeResult = { label: string; passed: boolean; detail: string };
@@ -134,8 +137,8 @@ export default function MaintenanceAdminPanel() {
       }
       const disposition = response.headers.get('content-disposition') ?? '';
       const suggested = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? '';
-      const filename = /^production-schema-0006-[\w-]+\.zip$/.test(suggested)
-        ? suggested : 'production-schema-0006-backup.zip';
+      const filename = /^production-schema-(0006|0010)-[\w-]+\.zip$/.test(suggested)
+        ? suggested : `production-schema-${overview?.profileVersion ?? 'unknown'}-backup.zip`;
       const blob = await response.blob();
       if (blob.size === 0) throw new Error('备份文件为空');
       const address = URL.createObjectURL(blob);
@@ -155,7 +158,7 @@ export default function MaintenanceAdminPanel() {
   }
 
   async function runWriteProbes() {
-    if (probeBusy || user?.systemRole !== 'SUPER_ADMIN' || health !== 'maintenance' || !overview?.matchesExpected0006) return;
+    if (probeBusy || user?.systemRole !== 'SUPER_ADMIN' || health !== 'maintenance' || !overview?.matchesExpectedBackup) return;
     setProbeBusy(true);
     setProbeResults([]);
     const results: ProbeResult[] = [];
@@ -202,18 +205,18 @@ export default function MaintenanceAdminPanel() {
         {overviewState === 'error' && <p className="status error">无法读取数据库概况，请刷新重试。</p>}
         {!overview && overviewState !== 'error' && <p className="status">正在读取表和结构版本…</p>}
         {overview && <><dl><dt>结构版本</dt><dd>{overview.schemaVersion}{overview.schemaRecognitionMethod === 'structural_inference' ? '（推断）' : ''}</dd><dt>业务表数量</dt><dd>{overview.tableCount}</dd>
-          <dt>0006 / 16 表核对</dt><dd>{overview.matchesExpected0006 && overview.schemaVersion === '0006' ? '一致' : '异常，请停止备份和验收'}</dd></dl>
+          <dt>{overview.profileVersion} / {overview.profileVersion === '0006' ? '16' : '19'} 表核对</dt><dd>{overview.matchesExpectedBackup ? '一致' : '异常，请停止备份和验收'}</dd></dl>
           <p className="muted">业务表：{overview.tables.join('、')}</p>
           <p className="muted">平台内部表（不计入业务表或备份）：{overview.platformTables.join('、') || '无'}</p>
           {overview.missingTables.length > 0 && <p className="status error">缺少业务表：{overview.missingTables.join('、')}</p>}
           {overview.unknownTables.length > 0 && <p className="status error">未知额外表：{overview.unknownTables.join('、')}。已停止备份，请人工确认。</p>}</>}</section>
       <section><h2>维护模式写入阻断验收</h2>
         <p>从本站逐项发起缺少有效业务参数的测试请求。每项必须返回 HTTP 503 和 SERVICE_MAINTENANCE；遇到异常立即停止后续请求。</p>
-        <button type="button" onClick={runWriteProbes} disabled={probeBusy || health !== 'maintenance' || !overview?.matchesExpected0006 || overview.schemaVersion !== '0006'}>{probeBusy ? '正在检查…' : '检查业务写入是否全部被阻止'}</button>
+        <button type="button" onClick={runWriteProbes} disabled={probeBusy || health !== 'maintenance' || !overview?.matchesExpectedBackup}>{probeBusy ? '正在检查…' : '检查业务写入是否全部被阻止'}</button>
         {probeResults.length > 0 && <ul className="probe-list">{probeResults.map((result) => <li key={result.label} className={result.passed ? 'probe-pass' : 'probe-fail'}>{result.label}：{result.passed ? 'PASS' : 'FAIL'}（{result.detail}）</li>)}</ul>}</section>
       <section><h2>生产备份</h2>
         <p className="warning">备份包含账号、会话、联系方式及完整族谱资料，请妥善保管，不要提交到 Git。</p>
-        <button type="button" onClick={downloadBackup} disabled={backupBusy || health !== 'maintenance' || !overview?.matchesExpected0006 || overview.schemaVersion !== '0006'}>{backupBusy ? '正在生成…' : '生成生产备份'}</button>
+        <button type="button" onClick={downloadBackup} disabled={backupBusy || health !== 'maintenance' || !overview?.matchesExpectedBackup}>{backupBusy ? '正在生成…' : '生成生产备份'}</button>
         {backupMessage && <output className="status">{backupMessage}</output>}</section>
     </>}
   </div></main>;

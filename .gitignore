@@ -32,12 +32,14 @@ yarn-error.log*
 # deployment and generated files
 .vercel
 next-env.d.ts
+*.tsbuildinfo
 /dist/
 /.wrangler/
 /outputs/
 /work/
 /backups/
 production-before-*.zip
+production-schema-*.zip
 *.production-backup.zip
 
 # Unrelated paused Java migration prototype; never publish with the Worker site.

@@ -1,0 +1,3 @@
+INSERT INTO user_identities(id,user_id,provider,provider_app_id,provider_user_id,union_id,union_scope,verified_at,created_at,last_login_at) VALUES('ui1','u-user','PHONE',NULL,'+8613000000002',NULL,NULL,'2026-09-25T00:00:00Z','2026-09-25T00:00:00Z',NULL);
+INSERT INTO sms_verifications(id,phone_e164,purpose,code_hash,expires_at,attempt_count,max_attempts,used_at,created_at,requested_ip_hash) VALUES('sv1','+8613000000002','LOGIN','hmac_sha256$fixture','2026-09-25T00:05:00Z',1,5,'2026-09-25T00:01:00Z','2026-09-25T00:00:00Z','fixture');
+INSERT INTO phone_change_challenges(id,user_id,old_phone_e164,token_hash,expires_at,used_at,created_at) VALUES('pc1','u-user','+8613000000002','fixture-token','2026-09-25T00:10:00Z',NULL,'2026-09-25T00:00:00Z');

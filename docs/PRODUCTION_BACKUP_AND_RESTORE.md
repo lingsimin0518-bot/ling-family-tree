@@ -1,94 +1,56 @@
 # 生产 D1 备份与本地恢复验证
 
-本功能用于在执行 `0006_collaboration_persistence.sql` 之前，对 Sites 托管的生产 D1 创建完整的只读逻辑备份。
+此功能只读导出 Sites 托管的 D1 数据。导出接口为 `POST /api/admin/backups/export`，服务端要求系统级 `SUPER_ADMIN`；族谱的 OWNER、ADMIN 等角色不能导出。备份包含账号、会话、联系方式、密码哈希及完整族谱资料，不能提交到 Git、发送到普通聊天或放在公开网盘。
 
-## 谁可以导出
+## 支持的结构
 
-只有系统级 `SUPER_ADMIN` 可以访问系统后台的“生产备份”页面并调用导出接口。族谱内部的 `OWNER`、`ADMIN`、`EDITOR`、`VIEWER` 均无权导出。
+| 数据库结构 | 业务表 | 识别要求 | 备份文件名 |
+| --- | ---: | --- | --- |
+| 0006 | 16 | 可识别的 D1/Sites 迁移记录，或明确标注的结构推断 | `production-schema-0006-时间.zip` |
+| 0010 | 19 | 可识别的 D1/Sites 迁移记录必须明确到 0010 | `production-schema-0010-时间.zip` |
 
-后端接口为：
+0010 增加的三张表是 `user_identities`、`sms_verifications` 和 `phone_change_challenges`。0010 本身只轮换旧族谱邀请码；如果没有旧族谱，表结构和 0009 完全相同。因此不能仅凭表或字段推断 0010 已执行。迁移记录无法确认时，19 表导出会拒绝执行。未知额外业务表、缺失表、结构不匹配和未轮换的旧邀请码也会使导出失败。Sites 和 D1 的已知内部元数据表单独列出，不计入业务表。
 
-```text
-POST /api/admin/backups/export
-```
+导出前后会核对结构及每张表行数，并比较业务表与索引定义。单表 JSON 上限为 16 MiB，总 JSON 上限为 48 MiB。备份是应用层逻辑导出，不是平台的时间点快照；应在维护模式下阻断写入并确认没有其他写入者。仅比较导出前后行数不能发现同时发生的等量增删。
 
-接口在 Worker 后端执行 `requireSuperAdmin(request)`，不是仅通过前端隐藏按钮限制。
+## 导出与保存
 
-## 如何导出
+1. 以系统级 SUPER_ADMIN 登录维护管理员页面 `/maintenance-admin`。
+2. 确认维护模式、结构版本、业务表数量、写入阻断检查都通过。
+3. 生成并下载 ZIP，保存到受保护的备份目录，记录文件名和 SHA-256。
+4. 在隔离的本地环境运行下方验证命令。出现任何 FAIL 时停止后续升级。
 
-1. 使用 `SUPER_ADMIN` 账号登录。
-2. 进入 `/admin`。
-3. 选择“生产备份”。
-4. 阅读敏感数据提示。
-5. 点击“生成并下载完整备份”。
-6. 将下载的 `production-before-0006-时间.zip` 保存到受保护的备份目录。
-
-导出是只读操作，不会执行 `INSERT`、`UPDATE` 或 `DELETE`，也不会应用 migration。
-
-## 备份内容
-
-ZIP 包含 `manifest.json`、`checksums.json`、Schema 说明和以下13张表的独立 JSON：
-
-- `action_idempotency`
-- `action_rate_limit`
-- `announcements`
-- `families`
-- `family_users`
-- `generations`
-- `media`
-- `person_claims`
-- `persons`
-- `relationships`
-- `system_audit_logs`
-- `user_sessions`
-- `users`
-
-备份保留完整恢复所需的敏感数据，包括密码哈希、邮箱、手机号、登录会话和完整族谱资料。
-
-## 安全保存
-
-- 不要把备份提交到 Git。
-- 不要发送到普通聊天、邮件附件或公开网盘。
-- 建议保存到加密磁盘或权限受限的离线目录。
-- 不要在日志中打印表数据或备份内容。
-- 从备份恢复出的 `user_sessions` 可能仍然有效，验证环境必须保持本地隔离。
-
-项目 `.gitignore` 已排除 `/backups/`、`production-before-*.zip` 和 `*.production-backup.zip`，但这不能替代安全保管。
+ZIP 包含 `manifest.json`、`checksums.json`、`schema/schema.json`、`schema/README.md` 和每张业务表的独立 JSON。不要打印或分享表 JSON。恢复出的会话可能仍有效，验证目录必须保持本地隔离并妥善清理。
 
 ## 本地恢复验证
 
 在项目目录运行：
 
 ```powershell
-pnpm backup:verify -- "F:\Backups\ling-family-tree\production-before-0006-时间.zip"
+pnpm backup:verify -- "F:\Backups\ling-family-tree\production-schema-0006-20261005-051115Z.zip"
+pnpm backup:verify -- "F:\Backups\ling-family-tree\production-schema-0010-时间.zip"
 ```
 
-验证工具会：
+工具依据 manifest 分别选择 0006/16 表或 0010/19 表配置，检查完整文件集合、schema、SHA-256 与每张表的行数；然后在新的临时本地 D1 上应用对应的 `0000–0006` 或 `0000–0010` 迁移，确认目标为空，导入数据，再检查行数、外键和业务关联。业务检查包括族谱成员与用户/族谱、人物与族谱、关系双方是否属于同一族谱、人物认领关联；0010 另查认证身份与用户及手机号身份唯一性，并检查旧族谱邀请码已轮换。工具只使用 `--local`，并从子进程移除 Cloudflare Token 和 Account ID；不会覆盖生产 D1。失败时不会输出 SQL 行内容。
 
-1. 检查 ZIP 文件集合和 manifest。
-2. 确认13张表齐全。
-3. 校验 SHA-256。
-4. 在系统临时目录创建全新的隔离本地 D1。
-5. 仅应用 `0000` 至 `0005` migration。
-6. 确认本地目标库为空。
-7. 导入13张表。
-8. 对比每张表的实际行数与 manifest。
-9. 执行外键一致性检查。
+旧 0006 备份应先恢复到 0006 本地结构，再在该隔离库应用 0007–0010；不要直接导入 0010 空库。项目内的合成数据测试覆盖这个升级过程：
 
-工具不会使用 `--remote`，并会从子进程环境中移除 Cloudflare API Token 和 Account ID。它不会覆盖已有的本地数据库。
-
-全部检查成功时，最后输出：
-
-```text
-PASS：备份结构、校验和、本地恢复、13张表行数和外键检查全部通过。
+```powershell
+pnpm backup:test-fixture
 ```
 
-出现任何 `FAIL` 时，都不能使用该文件作为执行 `0006` 前的有效备份。
+此测试会分别生成并恢复 0006 和 0010 合成备份，验证 0006→0010 本地升级，再比较两份合成备份。
 
-## 当前限制
+## 升级前后备份比较
 
-- 这是应用层逻辑备份，不是 Sites 平台的时间点数据库快照。
-- 导出前后会核对每张表行数；如果行数变化，导出失败。
-- Worker 存在内存和响应大小限制，达到安全上限时接口会明确失败，不会截断数据。
-- 当前没有线上一键恢复功能。
-- 本工具只用于本地恢复验证，不会恢复或覆盖生产 D1。
+在维护期获取已验证的旧 0006 备份和新 0010 备份后运行：
+
+```powershell
+node scripts/backup/compare-versions.mjs "F:\Backups\ling-family-tree\旧0006.zip" "F:\Backups\ling-family-tree\新0010.zip"
+```
+
+比较器首先校验两份 ZIP 的清单、版本和 SHA-256，再核对原有 16 张表的行数与所有记录；只允许 `LEGACY_STATIC` 族谱的 `join_code` 按 0010 规则轮换，以及 `user_sessions.last_seen_at` 变化。它另行核对用户、人物、关系的 ID 集合，系统角色、族谱成员角色和 OWNER 归属，以及会话 ID 集合。输出只包含表名、行数和通过/失败结论，不输出个人资料、会话 ID 或有效邀请码。
+
+若两次备份之间发生了其他业务写入，比较器会失败；先查明差异，不要把所有变化当成升级的正常结果。新三张表由迁移或后续认证流程生成，比较器报告其行数，但旧 0006 备份没有对应表可逐行比较。生产库的当前表集合和只读行数还应与新备份清单交叉核对，避免把旧备份误认为当前状态。
+
+当前没有线上一键恢复功能。任何生产恢复或迁移都应另行按审批后的操作方案执行。

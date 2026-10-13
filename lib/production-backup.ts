@@ -3,12 +3,12 @@ import hostingConfig from '../.openai/hosting.json';
 import type { BackupArchiveFile } from './backup-archive';
 import {
   inspectProductionSchema,
-  PRODUCTION_BACKUP_TABLES,
+  PRODUCTION_BACKUP_PROFILES,
   type ProductionBackupTable,
   type SchemaRecognitionMethod,
 } from './production-schema';
 
-export { PRODUCTION_BACKUP_TABLES } from './production-schema';
+export { PRODUCTION_BACKUP_TABLES, PRODUCTION_BACKUP_TABLES_0006, PRODUCTION_BACKUP_TABLES_0010 } from './production-schema';
 
 type ColumnInfo = {
   cid: number;
@@ -108,14 +108,14 @@ function countFrom(result: D1Result<unknown>) {
   return value;
 }
 
-async function readCounts(binding: D1Database) {
+async function readCounts(binding: D1Database, tables: readonly ProductionBackupTable[]) {
   const results = await binding.batch(
-    PRODUCTION_BACKUP_TABLES.map((table) =>
+    tables.map((table) =>
       binding.prepare(`SELECT COUNT(*) AS total FROM "${table}"`),
     ),
   );
   return new Map(
-    PRODUCTION_BACKUP_TABLES.map((table, index) => [table, countFrom(results[index])]),
+    tables.map((table, index) => [table, countFrom(results[index])]),
   );
 }
 
@@ -132,17 +132,19 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
       WHERE type IN ('table','index') ORDER BY type,name`)
     .all<SchemaObject>();
   const inspection = await inspectProductionSchema(binding);
-  if (!inspection.matchesExpected0006) {
-    throw new BackupSchemaMismatchError(`生产数据库与 0006/16 表备份白名单不一致：缺少 ${inspection.missingTables.join('、') || '无'}；未知额外表 ${inspection.unknownTables.join('、') || '无'}；结构版本 ${inspection.schemaVersion}`);
+  if (!inspection.matchesExpected0006 && !inspection.matchesExpected0010) {
+    throw new BackupSchemaMismatchError(`生产数据库与受支持的 0006/16 或 0010/19 表结构不一致：缺少 ${inspection.missingTables.join('、') || '无'}；未知额外表 ${inspection.unknownTables.join('、') || '无'}；结构版本 ${inspection.schemaVersion}`);
   }
   const schemaVersion = inspection.schemaVersion;
-  const countsBefore = await readCounts(binding);
+  const backupTables = PRODUCTION_BACKUP_PROFILES[inspection.profileVersion].tables;
+  const backupTableSet = new Set<string>(backupTables);
+  const countsBefore = await readCounts(binding, backupTables);
   const tableFiles: BackupArchiveFile[] = [];
   const tableManifests: TableManifest[] = [];
   const schemaTables: Record<string, ColumnInfo[]> = {};
   let totalJsonBytes = 0;
 
-  for (const table of PRODUCTION_BACKUP_TABLES) {
+  for (const table of backupTables) {
     const [columnsResult, rowsResult] = await Promise.all([
       binding.prepare(`PRAGMA table_info("${table}")`).all<ColumnInfo>(),
       binding.prepare(`SELECT * FROM "${table}"`).all<Record<string, unknown>>(),
@@ -174,30 +176,42 @@ export async function createProductionBackup(): Promise<ProductionBackup> {
     });
   }
 
-  const countsAfter = await readCounts(binding);
-  for (const table of PRODUCTION_BACKUP_TABLES) {
+  const countsAfter = await readCounts(binding, backupTables);
+  for (const table of backupTables) {
     if (countsBefore.get(table) !== countsAfter.get(table)) {
       throw new Error(`导出期间表 ${table} 行数发生变化，备份已终止`);
     }
   }
   const inspectionAfter = await inspectProductionSchema(binding);
-  if (!inspectionAfter.matchesExpected0006 || inspectionAfter.schemaVersion !== schemaVersion || inspectionAfter.businessTables.join('|') !== inspection.businessTables.join('|')) {
+  if (
+    !(inspectionAfter.matchesExpected0006 || inspectionAfter.matchesExpected0010)
+    || inspectionAfter.profileVersion !== inspection.profileVersion
+    || inspectionAfter.schemaVersion !== schemaVersion
+    || inspectionAfter.schemaRecognitionMethod !== inspection.schemaRecognitionMethod
+    || inspectionAfter.businessTables.join('|') !== inspection.businessTables.join('|')
+  ) {
     throw new BackupSchemaMismatchError('导出期间数据库结构发生变化，备份已终止');
+  }
+  const schemaResultAfter = await binding
+    .prepare(`SELECT type,name,tbl_name AS table_name,sql FROM sqlite_schema
+      WHERE type IN ('table','index') ORDER BY type,name`)
+    .all<SchemaObject>();
+  const businessSchema = (rows: SchemaObject[]) => rows.filter(
+    (entry) => backupTableSet.has(entry.table_name) || backupTableSet.has(entry.name),
+  );
+  if (JSON.stringify(businessSchema(schemaResult.results)) !== JSON.stringify(businessSchema(schemaResultAfter.results))) {
+    throw new BackupSchemaMismatchError('导出期间数据库表或索引结构发生变化，备份已终止');
   }
 
   const schemaJson = jsonBytes({
     schema_version: schemaVersion,
     schema_recognition_method: inspection.schemaRecognitionMethod,
     tables: schemaTables,
-    sqlite_schema: schemaResult.results.filter(
-      (entry) =>
-        PRODUCTION_BACKUP_TABLES.includes(entry.table_name as ProductionBackupTable) ||
-        PRODUCTION_BACKUP_TABLES.includes(entry.name as ProductionBackupTable),
-    ),
+    sqlite_schema: businessSchema(schemaResult.results),
   });
   const schemaReadme = encoder.encode(
     `生产 D1 逻辑备份\n\nSchema version: ${schemaVersion}\n` +
-      `Tables: ${PRODUCTION_BACKUP_TABLES.length}\n` +
+      `Tables: ${backupTables.length}\n` +
       '此备份包含账号、会话、联系方式、密码哈希及完整族谱资料。请勿公开或提交到 Git。\n',
   );
   const checksums: Record<string, string> = {};

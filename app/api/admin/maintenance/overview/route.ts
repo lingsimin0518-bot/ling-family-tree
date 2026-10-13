@@ -20,12 +20,15 @@ export async function GET(request: Request) {
     return Response.json({
       schemaVersion: inspection.schemaVersion,
       schemaRecognitionMethod: inspection.schemaRecognitionMethod,
+      profileVersion: inspection.profileVersion,
       tableCount: inspection.businessTables.length,
       tables: inspection.businessTables,
       platformTables: inspection.platformTables,
       unknownTables: inspection.unknownTables,
       missingTables: inspection.missingTables,
       matchesExpected0006: inspection.matchesExpected0006,
+      matchesExpected0010: inspection.matchesExpected0010,
+      matchesExpectedBackup: inspection.matchesExpectedBackup,
     }, { headers: NO_STORE });
   } catch (error) {
     if (error instanceof Response) {

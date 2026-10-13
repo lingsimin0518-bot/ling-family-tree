@@ -1,39 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createStoredZipStream } from '../../lib/backup-archive.ts';
+import { PROFILES } from './profiles.mjs';
 
-const TABLES_0006 = [
-  'action_idempotency',
-  'action_rate_limit',
-  'announcements',
-  'families',
-  'family_activities',
-  'family_users',
-  'generations',
-  'media',
-  'person_claims',
-  'persons',
-  'relationships',
-  'review_requests',
-  'system_audit_logs',
-  'user_messages',
-  'user_sessions',
-  'users',
-];
-const MIGRATIONS = [
-  '0000_multi_family.sql',
-  '0001_real_user_auth.sql',
-  '0002_wechat_identity.sql',
-  '0003_system_admin.sql',
-  '0004_unified_person_operations.sql',
-  '0005_creation_cooldown.sql',
-  '0006_collaboration_persistence.sql',
-];
-const PROFILE = { tables: TABLES_0006, migrations: MIGRATIONS, fixture: 'local-test-data.sql' };
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const encoder = new TextEncoder();
 
@@ -54,7 +27,11 @@ function runWrangler(args) {
     shell: false,
     maxBuffer: 32 * 1024 * 1024,
   });
-  if (result.status !== 0) fail(result.stderr || result.stdout || '本地 D1 命令失败');
+  if (result.status !== 0) {
+    const fileIndex = args.indexOf('--file');
+    const stage = fileIndex >= 0 ? basename(args[fileIndex + 1]) : '本地元数据命令';
+    fail(`本地 D1 命令失败（${stage}，退出码 ${result.status ?? '未知'}）`);
+  }
   return result.stdout;
 }
 
@@ -75,8 +52,9 @@ function sha256(bytes) {
 }
 
 async function main() {
-  const schemaVersion = '0006';
-  const profile = PROFILE;
+  const schemaVersion = process.argv.slice(2).find((argument) => argument !== '--') ?? '0010';
+  const profile = PROFILES[schemaVersion];
+  if (!profile) fail('仅支持 0006 或 0010 本地备份夹具');
   const work = await mkdtemp(join(tmpdir(), `backup-${profile.tables.length}-table-fixture-`));
   const state = join(work, 'state');
   const config = join(work, 'wrangler.jsonc');
@@ -106,13 +84,30 @@ async function main() {
   ];
   for (const migration of profile.migrations) {
     runWrangler([...base, '--file', join(projectRoot, 'drizzle', migration)]);
+    if (migration.startsWith('0006_')) {
+      // Keep the fixture populated while 0007–0010 run so their data migrations are tested.
+      runWrangler([
+        ...base, '--file',
+        join(projectRoot, 'scripts', 'backup', 'fixtures', 'local-test-data.sql'),
+      ]);
+    }
   }
-  runWrangler([
-    ...base,
-    '--file',
-    join(projectRoot, 'scripts', 'backup', 'fixtures', profile.fixture),
-  ]);
-  runWrangler([...base, '--command', 'CREATE TABLE __appgarden_migrations(id INTEGER PRIMARY KEY, opaque_record TEXT)']);
+  if (schemaVersion === '0010') {
+    runWrangler([
+      ...base, '--file',
+      join(projectRoot, 'scripts', 'backup', 'fixtures', 'local-test-data-0010.sql'),
+    ]);
+  }
+  const recognitionMethod = schemaVersion === '0006' ? 'structural_inference' : 'sites_migration_record';
+  if (schemaVersion === '0006') {
+    runWrangler([...base, '--command', 'CREATE TABLE __appgarden_migrations(id INTEGER PRIMARY KEY, opaque_record TEXT)']);
+  } else {
+    runWrangler([...base, '--command', 'CREATE TABLE __appgarden_migrations(id INTEGER PRIMARY KEY, name TEXT NOT NULL)']);
+    for (const [index, migration] of profile.migrations.entries()) {
+      runWrangler([...base, '--command',
+        `INSERT INTO __appgarden_migrations(id,name) VALUES(${index + 1},'${migration}')`]);
+    }
+  }
 
   const schemaRows = resultRows(
     runWrangler([
@@ -146,7 +141,7 @@ async function main() {
 
   const schemaJson = jsonBytes({
     schema_version: schemaVersion,
-    schema_recognition_method: 'structural_inference',
+    schema_recognition_method: recognitionMethod,
     tables: schemaTables,
     sqlite_schema: schemaRows.filter(
       (entry) => profile.tables.includes(entry.table_name) || profile.tables.includes(entry.name),
@@ -164,7 +159,7 @@ async function main() {
   const manifest = {
     backup_format_version: 1,
     schema_version: schemaVersion,
-    schema_recognition_method: 'structural_inference',
+    schema_recognition_method: recognitionMethod,
     export_started_at: now,
     export_finished_at: now,
     project_id: 'appgprj_6a9b746cbba88191bd63914f864ffb5e',

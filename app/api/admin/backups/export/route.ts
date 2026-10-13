@@ -6,13 +6,13 @@ import {
 } from '../../../../../lib/production-backup';
 import { requireSuperAdmin } from '../../../../../lib/auth';
 
-function backupFilename(date = new Date()) {
+function backupFilename(schemaVersion: string, date = new Date()) {
   const stamp = date
     .toISOString()
     .replace(/[-:]/g, '')
     .replace('T', '-')
     .replace(/\.\d{3}Z$/, 'Z');
-  return `production-schema-0006-${stamp}.zip`;
+  return `production-schema-${schemaVersion}-${stamp}.zip`;
 }
 
 function failure(message: string, status: number) {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         'Cache-Control': 'private, no-store',
-        'Content-Disposition': `attachment; filename="${backupFilename()}"`,
+        'Content-Disposition': `attachment; filename="${backupFilename(backup.manifest.schema_version)}"`,
         'Content-Type': 'application/zip',
         'X-Content-Type-Options': 'nosniff',
       },
