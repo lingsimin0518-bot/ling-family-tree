@@ -57,7 +57,7 @@ export class LifecycleError extends Error {
   }
 }
 
-async function constantTimeEqual(left: string, right: string) {
+export async function constantTimeEqual(left: string, right: string) {
   const [leftHash, rightHash] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(left)),
     crypto.subtle.digest('SHA-256', encoder.encode(right)),
@@ -97,6 +97,7 @@ export type ProductionResetInput = {
   expectedSecret: string;
   verifiedBackupSha256: string;
   expectedBackupSha256: string;
+  executionGuard?: { id: string; nonce: string };
 };
 
 export async function resetAllBusinessData(binding: D1Database, input: ProductionResetInput) {
@@ -122,8 +123,21 @@ export async function resetAllBusinessData(binding: D1Database, input: Productio
   }
 
   const before = await tableCounts(binding);
-  // D1 batch is transactional: if a DELETE statement fails, the whole batch is rolled back.
-  await binding.batch(BUSINESS_TABLE_DELETE_ORDER.map((table) => binding.prepare(`DELETE FROM "${table}"`)));
+  // Recheck authorization inside the DELETE transaction. A concurrent request
+  // must not use a SUPER_ADMIN check that completed before another Reset.
+  const guard = binding.prepare(`INSERT INTO action_idempotency
+    (id,actor_key,family_key,action_type,idempotency_key,status,created_at)
+    VALUES (CASE WHEN EXISTS (SELECT 1 FROM users WHERE id=? AND status='ACTIVE' AND system_role='SUPER_ADMIN')
+      AND (? IS NULL OR EXISTS (SELECT 1 FROM action_idempotency
+        WHERE id=? AND status='IN_PROGRESS' AND response_json=?))
+      THEN ? ELSE NULL END,?,'','PRODUCTION_RESET_ATOMIC_GUARD',?,'IN_PROGRESS',?)`)
+    .bind(input.operatorUserId, input.executionGuard?.id ?? null,
+      input.executionGuard?.id ?? null, input.executionGuard?.nonce ?? null,
+      `reset-guard:${crypto.randomUUID()}`, input.operatorUserId,
+      crypto.randomUUID(), new Date().toISOString());
+  // Any failed assertion or DELETE rolls back the whole D1 batch. The temporary
+  // guard is deleted by the existing fixed DELETE order, leaving all 19 empty.
+  await binding.batch([guard, ...BUSINESS_TABLE_DELETE_ORDER.map((table) => binding.prepare(`DELETE FROM "${table}"`))]);
   const after = await tableCounts(binding);
   const remaining = Object.entries(after).filter(([, count]) => count !== 0);
   if (remaining.length) {
