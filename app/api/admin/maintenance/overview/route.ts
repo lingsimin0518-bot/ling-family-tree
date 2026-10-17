@@ -18,6 +18,10 @@ export async function GET(request: Request) {
     const inspection = await inspectProductionSchema(binding);
 
     return Response.json({
+      maintenanceMode: true,
+      productionResetEnabled: (env as unknown as { PRODUCTION_RESET_ENABLED?: string }).PRODUCTION_RESET_ENABLED === 'true',
+      resetSecretConfigured: Boolean((env as unknown as { PRODUCTION_RESET_SECRET?: string }).PRODUCTION_RESET_SECRET),
+      runtimeDeploymentVerification: 'UNAVAILABLE',
       schemaVersion: inspection.schemaVersion,
       schemaRecognitionMethod: inspection.schemaRecognitionMethod,
       profileVersion: inspection.profileVersion,

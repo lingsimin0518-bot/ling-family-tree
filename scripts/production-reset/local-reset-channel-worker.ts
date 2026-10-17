@@ -39,8 +39,9 @@ const worker = {
       const schema = (await env.DB.prepare("SELECT type,name,sql FROM sqlite_schema WHERE type IN ('table','index','trigger') ORDER BY type,name").all()).results;
       const foreignKeyErrors = (await env.DB.prepare('PRAGMA foreign_key_check').all()).results.length;
       const locks = (await env.DB.prepare("SELECT status FROM action_idempotency WHERE action_type='PRODUCTION_RESET_OPERATION'").all()).results;
+      const resetAttempts = (await env.DB.prepare("SELECT id,action_type,status,response_json FROM action_idempotency WHERE action_type IN ('PRODUCTION_RESET_ATTEMPTS','PRODUCTION_RESET_OPERATION','PRODUCTION_RESET_ATOMIC_GUARD') ORDER BY id").all()).results;
       const migrations = (await env.DB.prepare('SELECT name FROM d1_migrations ORDER BY name').all()).results;
-      return Response.json({ counts, schema, foreignKeyErrors, locks, migrations });
+      return Response.json({ counts, schema, foreignKeyErrors, locks, resetAttempts, migrations });
     }
     if (path === '/fixture/action' && request.method === 'POST') {
       const { action } = await request.json<{ action: string }>();

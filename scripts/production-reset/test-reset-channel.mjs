@@ -109,6 +109,20 @@ async function reset(options = {}) {
   return { status: response.status, data: text && response.headers.get('content-type')?.includes('application/json')
     ? JSON.parse(text) : null, headers: response.headers };
 }
+async function disabledProbe(options = {}) {
+  const { user = 'u-super', scenario, headers = {}, raw = '{}' } = options;
+  const response = await fetch(origin + path, {
+    method: 'POST', signal: AbortSignal.timeout(30_000),
+    headers: { Connection: 'close', 'Content-Type': 'application/json', Origin: publicOrigin,
+      'X-Production-Reset-Disabled-Probe': 'v1',
+      ...(user ? { Cookie: `ling_session=${tokens[user]}` } : {}),
+      ...(scenario ? { 'X-Local-Test-Scenario': scenario } : {}), ...headers },
+    body: raw,
+  });
+  const text = await response.text();
+  ok(!text.includes(secret) && !Object.values(tokens).some((token) => text.includes(token)), '自检响应不暴露凭证');
+  return { status: response.status, data: JSON.parse(text), headers: response.headers };
+}
 async function fixture(action) {
   const response = await fetch(origin + '/fixture/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
   if (!response.ok) throw new Error('本地夹具操作失败');
@@ -152,6 +166,17 @@ async function denial(options, status, code, label) {
   ok(result.status === status && result.data?.code === code, label);
   ok(Object.values((await currentState()).counts).every((count) => count > 0), '拒绝请求后原19表数据仍存在');
 }
+async function probeDenial(options, status, code, label) {
+  await fixture('clear-operation-state');
+  const before = await currentState();
+  const result = await disabledProbe(options);
+  const after = await currentState();
+  ok(result.status === status && result.data?.code === code, label);
+  ok(result.headers.get('Cache-Control') === 'private, no-store', `${label}响应不可缓存`);
+  ok(JSON.stringify(before.counts) === JSON.stringify(after.counts)
+    && JSON.stringify(before.resetAttempts) === JSON.stringify(after.resetAttempts)
+    && JSON.stringify(before.locks) === JSON.stringify(after.locks), `${label}不更改任何表行数或Reset尝试记录`);
+}
 
 await start();
 let after;
@@ -160,6 +185,24 @@ try {
   ok(Object.keys(before.counts).length === 19 && Object.values(before.counts).every((count) => count > 0), '全新本地0010数据库19表均有夹具数据');
   let result = await reset({ method: 'GET' });
   ok(result.status === 405 && result.data.code === 'METHOD_NOT_ALLOWED', 'GET不执行也不泄露配置');
+  await probeDenial({ scenario: 'disabled' }, 503, 'RESET_DISABLED', '已关闭Reset时同源管理员自检返回禁用');
+  await probeDenial({}, 409, 'RESET_PROBE_NOT_DISABLED', '误开启Reset时自检仍在核心执行前拒绝');
+  await probeDenial({ user: null }, 401, 'UNAUTHORIZED', '匿名用户不能读取Reset禁用状态');
+  for (const user of ['u-user', 'u-owner', 'u-admin']) {
+    await probeDenial({ user }, 403, 'FORBIDDEN', `${user}不能调用Reset自检`);
+  }
+  await fixture('disable-super');
+  await probeDenial({}, 401, 'UNAUTHORIZED', '已禁用SUPER_ADMIN不能自检');
+  await fixture('restore-super');
+  await fixture('expire-super-session');
+  await probeDenial({}, 401, 'UNAUTHORIZED', '过期SUPER_ADMIN会话不能自检');
+  await fixture('restore-super-session');
+  await probeDenial({ scenario: 'maintenance-off' }, 503, 'MAINTENANCE_REQUIRED', '非维护模式不能自检');
+  await probeDenial({ headers: { Origin: 'https://attacker.example' } }, 403, 'RESET_ORIGIN_INVALID', '跨站请求不能自检');
+  await probeDenial({ headers: { Origin: '' } }, 403, 'RESET_ORIGIN_INVALID', '缺少Origin不能自检');
+  await probeDenial({ headers: { 'X-Production-Reset-Secret': secret } }, 400, 'RESET_PROBE_INVALID', '自检禁止携带Secret');
+  await probeDenial({ headers: { 'X-Production-Reset-Disabled-Probe': 'other' } }, 400, 'RESET_PROBE_INVALID', '错误自检标记被拒绝');
+  await probeDenial({ raw: JSON.stringify(body) }, 400, 'RESET_PROBE_INVALID', '自检禁止携带真实Reset参数');
   await denial({ scenario: 'disabled' }, 503, 'RESET_DISABLED', '默认关闭开关拒绝');
   await denial({ scenario: 'maintenance-off' }, 503, 'MAINTENANCE_REQUIRED', '非维护模式拒绝');
   await denial({ user: null }, 401, 'UNAUTHORIZED', '未登录拒绝');

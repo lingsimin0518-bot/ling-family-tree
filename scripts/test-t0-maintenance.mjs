@@ -260,6 +260,9 @@ try {
   }
   result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
   ok(result.response.status === 200 && result.data.schemaVersion === '0006' && result.data.schemaRecognitionMethod === 'structural_inference' && result.data.tableCount === 16 && result.data.matchesExpected0006 === true && result.data.tables.length === 16 && result.data.platformTables.includes('__appgarden_migrations'), 'A：Sites 元数据单列且结构版本明确标记为 0006（推断），16 张业务表可备份');
+  ok(result.data.maintenanceMode === true && result.data.productionResetEnabled === false
+    && result.data.resetSecretConfigured === false && result.data.runtimeDeploymentVerification === 'UNAVAILABLE'
+    && !JSON.stringify(result.data).includes('PRODUCTION_RESET_SECRET'), '0006概况只返回安全运维状态，不泄露Secret');
   ok(result.response.headers.get('cache-control') === 'private, no-store', '维护期数据库概况禁止缓存');
   result = await request('/api/auth/login', 'POST', { username: 'super', password: 'local-test-password' });
   ok(result.response.status === 200 && Boolean(result.response.headers.get('set-cookie')), '维护期间沿用原用户名密码登录');

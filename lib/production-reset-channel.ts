@@ -9,6 +9,7 @@ export const RESET_ORIGIN = 'https://lingshi-family-tree.lingsimin0518.chatgpt.s
 export const RESET_PATH = '/api/admin/operations/production-reset';
 const MAX_BODY_BYTES = 2048;
 const MAX_ATTEMPTS = 3;
+const DISABLED_PROBE_HEADER = 'x-production-reset-disabled-probe';
 const NO_STORE = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 
 export type ResetChannelEnvironment = {
@@ -54,7 +55,7 @@ function checkOrigin(request: Request) {
     || (fetchSite !== null && fetchSite !== 'same-origin')) reject(403, 'RESET_ORIGIN_INVALID');
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown>> {
+async function readJsonRecord(request: Request): Promise<Record<string, unknown>> {
   if (request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
     reject(415, 'RESET_REQUEST_INVALID');
   }
@@ -78,16 +79,20 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     const body: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     if (!body || typeof body !== 'object' || Array.isArray(body)) reject(400, 'RESET_REQUEST_INVALID');
-    const record = body as Record<string, unknown>;
-    const fields = ['projectId', 'databaseBinding', 'schema', 'sitesVersion', 'deploymentId', 'backupSha256', 'confirmation'];
-    if (Object.keys(record).length !== fields.length || fields.some((key) => !Object.hasOwn(record, key))) {
-      reject(400, 'RESET_REQUEST_INVALID');
-    }
-    return record;
+    return body as Record<string, unknown>;
   } catch (error) {
     if (error instanceof ResetChannelError) throw error;
     reject(400, 'RESET_REQUEST_INVALID');
   } finally { reader.releaseLock(); }
+}
+
+async function readBody(request: Request): Promise<Record<string, unknown>> {
+  const record = await readJsonRecord(request);
+  const fields = ['projectId', 'databaseBinding', 'schema', 'sitesVersion', 'deploymentId', 'backupSha256', 'confirmation'];
+  if (Object.keys(record).length !== fields.length || fields.some((key) => !Object.hasOwn(record, key))) {
+    reject(400, 'RESET_REQUEST_INVALID');
+  }
+  return record;
 }
 
 async function operationId(projectId: string, version: number, deployment: string, backup: string) {
@@ -131,6 +136,22 @@ export async function handleProductionReset(request: Request, settings: ResetCha
   });
   try {
     if (request.method !== 'POST') return respond({ ok: false, code: 'METHOD_NOT_ALLOWED' }, 405);
+    if (request.headers.has(DISABLED_PROBE_HEADER)) {
+      // A dedicated, authenticated, read-only branch. It must return before
+      // consumeAttempt(), the operation claim, or resetAllBusinessData(), even
+      // if someone accidentally enables the real Reset channel later.
+      if (request.headers.get(DISABLED_PROBE_HEADER) !== 'v1') reject(400, 'RESET_PROBE_INVALID');
+      if (settings.MAINTENANCE_MODE !== 'true') reject(503, 'MAINTENANCE_REQUIRED');
+      checkOrigin(request);
+      const probeUser = await dependencies.requireSuperAdmin(request);
+      if (probeUser.systemRole !== 'SUPER_ADMIN' || probeUser.status !== 'ACTIVE') reject(403, 'FORBIDDEN');
+      operatorId = probeUser.id;
+      if (request.headers.has('x-production-reset-secret') || Object.keys(await readJsonRecord(request)).length !== 0) {
+        reject(400, 'RESET_PROBE_INVALID');
+      }
+      if (settings.PRODUCTION_RESET_ENABLED !== 'true') reject(503, 'RESET_DISABLED');
+      reject(409, 'RESET_PROBE_NOT_DISABLED');
+    }
     if (settings.PRODUCTION_RESET_ENABLED !== 'true') reject(503, 'RESET_DISABLED');
     if (settings.MAINTENANCE_MODE !== 'true') reject(503, 'MAINTENANCE_REQUIRED');
     checkOrigin(request);

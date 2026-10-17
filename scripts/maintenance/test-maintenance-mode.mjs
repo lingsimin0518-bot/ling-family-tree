@@ -164,8 +164,13 @@ async function request(path, method = 'GET', body, cookie = '') {
 }
 
 await writeConfig(true);
-for (const migration of migrations) run([...d1, '--file', join(root, 'drizzle', migration)]);
+for (const migration of migrations.filter((name) => !name.startsWith('0010_'))) {
+  run([...d1, '--file', join(root, 'drizzle', migration)]);
+}
 run([...d1, '--file', join(root, 'scripts', 'backup', 'fixtures', 'local-test-data.sql')]);
+// Reproduce the real upgrade order: apply the data-only 0010 containment
+// after legacy fixture rows exist, not before inserting them.
+run([...d1, '--file', join(root, 'drizzle', '0010_security_s0_containment.sql')]);
 const ledger = join(work, 'migration-ledger.sql');
 await writeFile(
   ledger,
@@ -185,6 +190,16 @@ try {
   );
   result = await request('/api/health');
   ok(result.response.status === 200 && result.data.status === 'maintenance', 'health 报告维护状态');
+  result = await request('/maintenance-admin');
+  ok(result.response.status === 200 && String(result.data).includes('管理员安全检查')
+    && !String(result.data).includes('验证 Reset 禁用状态'), '未确认Session前运维自检按钮不在服务端初始页面');
+  result = await request('/api/admin/maintenance/overview');
+  ok(result.response.status === 401, '未登录不能读取0010运维状态');
+  result = await request('/api/admin/maintenance/overview', 'GET', undefined, superCookie);
+  ok(result.response.status === 200 && result.data.schemaVersion === '0010' && result.data.tableCount === 19
+    && result.data.matchesExpected0010 === true && result.data.maintenanceMode === true
+    && result.data.productionResetEnabled === false && result.data.resetSecretConfigured === false
+    && result.data.runtimeDeploymentVerification === 'UNAVAILABLE', `SUPER_ADMIN只读0010/19表与安全开关状态（${JSON.stringify({ status: result.response.status, schema: result.data.schemaVersion, tables: result.data.tableCount, match: result.data.matchesExpected0010, maintenance: result.data.maintenanceMode, enabled: result.data.productionResetEnabled, secretConfigured: result.data.resetSecretConfigured, deployment: result.data.runtimeDeploymentVerification })}）`);
   result = await request('/api/families');
   ok(
     result.response.status === 503 && result.data.code === 'SERVICE_MAINTENANCE',
@@ -252,6 +267,10 @@ try {
       !backupRoute.includes('maintenanceResponse'),
     '生产备份只由 SUPER_ADMIN 权限保护，不受业务维护门禁影响',
   );
+  const panel = await readFile(join(root, 'app', 'maintenance-admin', 'panel.tsx'), 'utf8');
+  ok(!/localStorage|sessionStorage|indexedDB|document\.cookie|X-Production-Reset-Secret/.test(panel)
+    && panel.includes("body: '{}'") && panel.includes('验证 Reset 禁用状态')
+    && panel.includes('验证维护模式写入拦截'), '客户端包含两项自检，且不读取Cookie、存储或发送Reset Secret');
 } finally {
   await stopServer(server);
 }
