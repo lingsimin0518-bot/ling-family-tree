@@ -21,6 +21,7 @@
     "test:security-s0": "node scripts/security/test-s0-containment.mjs",
     "test:production-reset": "node scripts/production-reset/test-production-reset.mjs",
     "test:reset-channel": "node scripts/production-reset/test-reset-channel.mjs",
+    "test:reset-form": "node scripts/production-reset/test-reset-form.mjs",
     "test:upgrade-0006-0010": "node scripts/migrations/test-upgrade-0006-to-0010.mjs",
     "test:maintenance": "node scripts/maintenance/test-maintenance-mode.mjs",
     "check:aliyun-sms-config": "node scripts/aliyun-sms/check-real-config.mjs",

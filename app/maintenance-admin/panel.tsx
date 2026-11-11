@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type SyntheticEvent } from 'react';
+import ProductionResetForm, { type ResetTarget } from './reset-form';
 
 type SessionUser = {
   id: string;
@@ -12,6 +13,7 @@ type Overview = {
   maintenanceMode: boolean;
   productionResetEnabled: boolean;
   resetSecretConfigured: boolean;
+  resetTarget: ResetTarget | null;
   runtimeDeploymentVerification: 'UNAVAILABLE';
   schemaVersion: string;
   profileVersion: '0006' | '0010';
@@ -278,7 +280,7 @@ export default function MaintenanceAdminPanel() {
 
   return <main className="maintenance-admin"><div className="maintenance-admin-shell">
     <header><p className="eyebrow">家谱 · 维护期专用</p><h1>管理员安全检查</h1>
-      <p>仅使用现有账号、会话及系统级 SUPER_ADMIN 权限。这里不提供数据修改、迁移或重置功能。</p></header>
+      <p>仅使用现有账号、会话及系统级 SUPER_ADMIN 权限。Production Reset 只在维护期武装后显示，必须再次人工确认。</p></header>
     <section><h2>维护状态</h2><dl><dt>当前模式</dt><dd>{health === 'loading' ? '检查中…' : health === 'maintenance' ? '维护中' : health === 'operational' ? '未开启维护模式' : '读取失败'}</dd>
       <dt>/api/health</dt><dd>{health === 'maintenance' || health === 'operational' ? '正常' : health === 'loading' ? '检查中…' : '失败'}</dd></dl></section>
     {sessionState === 'loading' && <section><p className="status">正在确认登录状态…</p></section>}
@@ -309,7 +311,7 @@ export default function MaintenanceAdminPanel() {
           {overview.missingTables.length > 0 && <p className="status error">缺少业务表：{overview.missingTables.join('、')}</p>}
           {overview.unknownTables.length > 0 && <p className="status error">未知额外表：{overview.unknownTables.join('、')}。已停止备份，请人工确认。</p>}</>}</section>
       <section><h2>维护期运维自检</h2>
-        <p>只检查禁用状态与维护门禁，不执行数据重置。当前版本不提供实际 Reset 表单或执行按钮。若运维配置刚变更，请先刷新页面重新读取状态。</p>
+        <p>这里只检查禁用状态与维护门禁。若运维配置刚变更，请先刷新页面重新读取状态。</p>
         {overview?.productionResetEnabled && <p className="status error" role="alert">Reset 开关已开启：禁用态验收停止，请人工核对配置。</p>}
         <button type="button" onClick={checkResetDisabled} disabled={resetCheckBusy || health !== 'maintenance' || !overview?.maintenanceMode || overview?.productionResetEnabled !== false || !readyFor0010}>
           {resetCheckBusy ? '正在检查…' : '验证 Reset 禁用状态'}
@@ -332,6 +334,9 @@ export default function MaintenanceAdminPanel() {
         <p className="warning">备份包含账号、会话、联系方式及完整族谱资料，请妥善保管，不要提交到 Git。</p>
         <button type="button" onClick={downloadBackup} disabled={backupBusy || health !== 'maintenance' || !overview?.matchesExpectedBackup}>{backupBusy ? '正在生成…' : '生成生产备份'}</button>
         {backupMessage && <output className="status">{backupMessage}</output>}</section>
+      {health === 'maintenance' && overview?.maintenanceMode && overview.productionResetEnabled
+        && overview.resetSecretConfigured && readyFor0010 && overview.resetTarget
+        && <ProductionResetForm target={overview.resetTarget} />}
     </>}
   </div></main>;
 }

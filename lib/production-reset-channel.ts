@@ -5,7 +5,7 @@ import { inspectProductionSchema } from './production-schema';
 
 // This temporary channel has no UI, no public configuration endpoint and no
 // deployment-time side effect. Remove the route and this module after use.
-export const RESET_ORIGIN = 'https://lingshi-family-tree.lingsimin0518.chatgpt.site';
+export const RESET_ORIGIN = 'https://family-tree.lingsimin0518.chatgpt.site';
 export const RESET_PATH = '/api/admin/operations/production-reset';
 const MAX_BODY_BYTES = 2048;
 const MAX_ATTEMPTS = 3;
