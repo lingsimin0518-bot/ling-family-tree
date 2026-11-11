@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
+import { localFetch as fetch } from '../test-support/local-http.mjs';
+import { createServer } from 'node:net';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const cli = process.env.npm_execpath;
@@ -10,7 +12,10 @@ if (!cli) throw new Error('请通过 pnpm test:phone-auth 运行测试');
 const work = await mkdtemp(join(tmpdir(), 'phone-auth-'));
 const state = join(work, 'state');
 const config = join(work, 'wrangler.json');
-const port = 8799;
+const listener = createServer();
+await new Promise((done, fail) => { listener.once('error', fail); listener.listen(0, '127.0.0.1', done); });
+const port = listener.address().port;
+await new Promise((done) => listener.close(done));
 const origin = `http://127.0.0.1:${port}`;
 await writeFile(config, JSON.stringify({
   name: 'phone-auth-test', compatibility_date: '2026-05-15', compatibility_flags: ['nodejs_compat'],
@@ -32,10 +37,11 @@ for (const file of ['0000_multi_family.sql','0001_real_user_auth.sql','0002_wech
 }
 
 const wranglerCli=join(root,'node_modules','wrangler','bin','wrangler.js');
-const server = spawn(process.execPath,[wranglerCli,'dev','--config',config,'--persist-to',state,'--port',String(port)],{cwd:root,stdio:['ignore','pipe','pipe'],env:{...process.env}});
+const localEnv = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(work, 'tool.log') };
+delete localEnv.CLOUDFLARE_API_TOKEN; delete localEnv.CLOUDFLARE_ACCOUNT_ID;
+const server = spawn(process.execPath,[wranglerCli,'dev','--local','--config',config,'--persist-to',state,'--port',String(port)],{cwd:root,stdio:['ignore','pipe','pipe'],env:localEnv});
 let serverOutput=''; server.stdout.on('data',(chunk)=>serverOutput+=chunk); server.stderr.on('data',(chunk)=>serverOutput+=chunk);
 const pause=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
-for(let attempt=0;attempt<40;attempt+=1){try{const response=await fetch(origin);if(response.status<500)break}catch{}await pause(250);if(attempt===39)throw new Error(`本地服务未启动：${serverOutput}`)}
 
 async function post(path,body,cookie=''){
   const response=await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify(body)});
@@ -47,6 +53,13 @@ function sql(command){return run([...d1,'--command',command,'--json'])}
 function ageCodes(phone){sql(`UPDATE sms_verifications SET created_at='2020-01-01T00:00:00Z' WHERE phone_e164='${phone}'`) }
 
 try{
+  let ready = false;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (server.exitCode !== null) break;
+    try { const response = await fetch(origin + '/api/health', { signal: AbortSignal.timeout(1000) }); if (response.status === 200) { ready = true; break; } } catch { /* Poll readiness GET only; never replay authentication POSTs. */ }
+    await pause(250);
+  }
+  if (!ready) throw new Error(serverOutput.includes('EADDRINUSE') ? 'LOCAL_PORT_CONFLICT' : 'LOCAL_WORKER_NOT_READY');
   const invalid=await post('/api/auth/sms/send',{phone:'+819012345678',purpose:'REGISTER'}); ok(invalid.status===400,'非中国号码拒绝');
   let response=await post('/api/auth/sms/send',{phone:'13800138000',purpose:'REGISTER'}); ok(response.status===200,'REGISTER验证码发送');
   const cooldown=await post('/api/auth/sms/send',{phone:'13800138000',purpose:'REGISTER'}); ok(cooldown.status===429,'60秒冷却');

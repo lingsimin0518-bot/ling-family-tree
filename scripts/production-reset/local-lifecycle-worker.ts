@@ -1,5 +1,6 @@
 import {
   bootstrapSuperAdmin,
+  BUSINESS_TABLES,
   LifecycleError,
   resetAllBusinessData,
 } from '../../lib/production-lifecycle';
@@ -21,9 +22,29 @@ const localLifecycleWorker = {
   async fetch(request: Request, env: TestEnv) {
     try {
       if (env.APP_ENV !== 'local-reset-test') return reply({ error: 'not found' }, 404);
+      const path = new URL(request.url).pathname;
+      if (request.method === 'GET' && path === '/test/health') return reply({ ready: 'local-lifecycle' });
+      // Fixed local fixture inspection uses the same running D1 runtime as the
+      // real core. Never start a second SQLite owner just to inspect its state.
+      if (request.method === 'GET' && path === '/test/state') {
+        const results = await env.DB.batch(BUSINESS_TABLES.map((table) => env.DB.prepare(`SELECT * FROM "${table}"`)));
+        const rows = Object.fromEntries(BUSINESS_TABLES.map((table, index) => [table, results[index].results]));
+        const counts = Object.fromEntries(BUSINESS_TABLES.map((table) => [table, rows[table].length]));
+        const schema = (await env.DB.prepare("SELECT type,name,sql FROM sqlite_schema WHERE type IN ('table','index','trigger','view') ORDER BY type,name").all()).results;
+        const migrations = (await env.DB.prepare('SELECT * FROM d1_migrations ORDER BY id').all()).results;
+        const foreignKeys = (await env.DB.prepare('PRAGMA foreign_key_check').all()).results;
+        return reply({ rows, counts, schema, migrations, foreignKeys });
+      }
       if (request.method !== 'POST') return reply({ error: 'method not allowed' }, 405);
       const body = await request.json<Record<string, string>>();
-      const path = new URL(request.url).pathname;
+      if (path === '/test/fail-delete') {
+        await env.DB.prepare("CREATE TRIGGER local_fail_lifecycle BEFORE DELETE ON persons BEGIN SELECT RAISE(ABORT,'local DELETE failure'); END").run();
+        return reply({ ok: true });
+      }
+      if (path === '/test/remove-failure') {
+        await env.DB.prepare('DROP TRIGGER local_fail_lifecycle').run();
+        return reply({ ok: true });
+      }
       if (path === '/test/reset') {
         return reply(await resetAllBusinessData(env.DB, {
           environment: env.APP_ENV,
