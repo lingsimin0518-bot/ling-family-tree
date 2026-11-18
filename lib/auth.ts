@@ -149,9 +149,10 @@ export async function createAuthSession(userId: string, request: Request) {
   return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
 
-export async function registerUser(input: Record<string,unknown>, request: Request) {
+// Shared preparation never writes an account or issues a session. Operational
+// registration can reuse every normal validation/hash rule inside its own batch.
+export async function prepareUserRegistration(input: Record<string,unknown>, binding: D1Database = authDb()) {
   const values = validateRegistration(input);
-  const binding = authDb();
   const usernameMatch = await binding.prepare('SELECT id FROM users WHERE username=? COLLATE NOCASE').bind(values.username).first();
   if (usernameMatch) throw new Response('该用户名已被使用', {status:409});
   if (values.phone) {
@@ -166,9 +167,26 @@ export async function registerUser(input: Record<string,unknown>, request: Reque
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const passwordHash = await hashPassword(values.password);
+  return { id, username:values.username, email:values.email, phone:values.phone,
+    nickname:values.nickname, passwordHash, createdAt:now };
+}
+
+export type PreparedUserRegistration = Awaited<ReturnType<typeof prepareUserRegistration>>;
+
+export function userRegistrationInsert(binding: D1Database, account: PreparedUserRegistration) {
+  return binding.prepare(`INSERT INTO users
+    (id,username,password_hash,email,phone,nickname,avatar,status,system_role,display_name,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,'ACTIVE','USER',?,?,?)`)
+    .bind(account.id,account.username,account.passwordHash,account.email || null,account.phone || null,
+      account.nickname,'',account.nickname,account.createdAt,account.createdAt);
+}
+
+export async function registerUser(input: Record<string,unknown>, request: Request) {
+  const binding = authDb();
+  const account = await prepareUserRegistration(input,binding);
+  const { id } = account;
   try {
-    const inserted = await binding.prepare('INSERT INTO users (id,username,password_hash,email,phone,nickname,avatar,status,display_name,created_at,updated_at) VALUES (?,?,?,?,?,?,?,\'ACTIVE\',?,?,?)')
-      .bind(id,values.username,passwordHash,values.email || null,values.phone || null,values.nickname,'',values.nickname,now,now).run();
+    const inserted = await userRegistrationInsert(binding,account).run();
     if (Number(inserted.meta.changes ?? 0) !== 1) throw new Error('registration insert did not create exactly one user');
   } catch (error) {
     console.error('registration insert failed');

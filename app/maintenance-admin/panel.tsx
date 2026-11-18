@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type SyntheticEvent } from 'react';
 import ProductionResetForm, { type ResetTarget } from './reset-form';
+import InitialUserRegistrationForm from './initial-user-form';
 
 type SessionUser = {
   id: string;
@@ -285,6 +286,7 @@ export default function MaintenanceAdminPanel() {
       <dt>/api/health</dt><dd>{health === 'maintenance' || health === 'operational' ? '正常' : health === 'loading' ? '检查中…' : '失败'}</dd></dl></section>
     {sessionState === 'loading' && <section><p className="status">正在确认登录状态…</p></section>}
     {sessionState === 'error' && <section><p className="status error">登录状态读取失败，请刷新页面重试。</p></section>}
+    {health === 'maintenance' && sessionState === 'signed-out' && <InitialUserRegistrationForm />}
     {sessionState === 'signed-out' && <section><h2>使用现有账号登录</h2>
       <form onSubmit={handleLogin}><label htmlFor="maintenance-username">用户名</label>
         <input id="maintenance-username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required />
